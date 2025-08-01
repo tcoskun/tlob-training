@@ -1,0 +1,28 @@
+{
+  "portfolio_stats": {
+    "total_return": -0.011458499999999816,
+    "annual_return": -0.999996423459826,
+    "volatility": 0.4396945276348895,
+    "sharpe_ratio": -28.302574221454556,
+    "max_drawdown": -0.023382119046825967,
+    "calmar_ratio": -42.76757044377343,
+    "win_rate": 0.0,
+    "profit_factor": 0.0,
+    "avg_win": 0.0,
+    "avg_loss": 0.0,
+    "var_95": -0.0010109777942917924,
+    "cvar_95": 0.0
+  },
+  "portfolio_data_shape": [
+    483,
+    1
+  ],
+  "returns_shape": [
+    482,
+    1
+  ],
+  "lob_symbols": [
+    "07"
+  ],
+  "analysis_date": "2025-08-01T11:28:06.472414"
+}

@@ -16,6 +16,12 @@ omegaconf>=2.3.0
 pytorch-lightning>=2.0.0
 transformers>=4.20.0
 
+# Portfolio Analysis with VectorBT
+vectorbt>=0.25.0
+ta>=0.10.0
+empyrical>=0.5.5
+pyfolio>=0.9.2
+
 # Additional utilities
 tqdm>=4.64.0
 jupyter>=1.0.0

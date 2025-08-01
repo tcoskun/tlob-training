@@ -21,7 +21,7 @@ model:
 
 # Eğitim ayarları
 training:
-  epochs: 250
+  epochs: 100
   batch_size: 512
   learning_rate: 0.0001  # Düşürüldü: 0.0002 -> 0.0001
   early_stopping_patience: 15  # Artırıldı: 7 -> 15
@@ -35,4 +35,43 @@ visualization:
   show_confidence: true   # Güven skorlarını göster
   interactive: true
   plot_style: "seaborn"
-  figure_size: [12, 8] 
+  figure_size: [12, 8]
+
+# Portföy Analizi Ayarları (LOB Verileri ile)
+portfolio:
+  # LOB veri dosyalarından sembol çıkarma
+  data_directory: "data"
+  
+  # Portföy oluşturma ayarları
+  price_type: "Mid_Price"  # Mid_Price, Level 1 Bid Price, Level 1 Ask Price
+  resample_frequency: "1T"  # 1 dakika
+  
+  # Portföy ağırlıkları (None = eşit ağırlık)
+  weights:
+    AKBNK: 1.0  # Tek sembol için tam ağırlık
+  
+  # Rebalancing sıklığı
+  rebalance_freq: "H"  # Saatlik rebalancing
+  
+  # LOB tabanlı trading stratejileri
+  strategies:
+    - name: "spread_based"
+      params:
+        spread_threshold: 0.001
+    - name: "volume_imbalance"
+      params:
+        imbalance_threshold: 0.1
+    - name: "price_momentum"
+      params:
+        momentum_window: 10
+        momentum_threshold: 0.001
+    - name: "level_depth"
+      params:
+        depth_threshold: 1000000
+  
+  # Risk yönetimi
+  risk_management:
+    max_position_size: 0.25  # Maksimum pozisyon büyüklüğü
+    stop_loss: 0.05          # Stop loss yüzdesi
+    take_profit: 0.15        # Take profit yüzdesi
+    max_drawdown: 0.20       # Maksimum drawdown limiti 
