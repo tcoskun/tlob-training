@@ -1,15 +1,60 @@
 {
   "project_info": {
     "name": "TLOB Price Prediction Project",
-    "date": "2025-07-16T16:07:13.035672",
-    "data_source": "/Users/tolgacoskun-mac/Source/training/data/2025-07-11-AKBNK-10.csv",
+    "date": "2025-08-01T16:18:34.717822",
+    "data_source": "/Users/tolgacoskun-mac/Source/tlob-training/data/2025-07-11-AKBNK-10.csv",
     "total_data_points": 28784,
     "model_type": "TLOB"
   },
+  "model_config": {
+    "data": {
+      "data_dir": "data",
+      "file_pattern": "*.csv",
+      "train_split": 0.72,
+      "val_split": 0.18,
+      "test_split": 0.1,
+      "random_state": 42,
+      "data_source": "data/2025-07-11-AKBNK-10.csv"
+    },
+    "model": {
+      "type": "TLOB",
+      "hidden_dim": 64,
+      "num_layers": 3,
+      "seq_size": 64,
+      "num_heads": 4,
+      "is_sin_emb": true,
+      "horizon": 10,
+      "forecast_days": 10
+    },
+    "training": {
+      "epochs": 1,
+      "batch_size": 512,
+      "learning_rate": 0.0001,
+      "early_stopping_patience": 15,
+      "min_delta": 0.001,
+      "device": "mps"
+    },
+    "visualization": {
+      "plot_samples": 1000,
+      "save_plots": true,
+      "show_confidence": true,
+      "interactive": true,
+      "plot_style": "seaborn",
+      "figure_size": [
+        12,
+        8
+      ]
+    },
+    "portfolio": {
+      "data_directory": "data",
+      "strategy_type": "random",
+      "init_cash": 10000
+    }
+  },
   "training_summary": {
     "total_epochs": 1,
-    "final_train_loss": 0.2668,
-    "final_val_loss": 0.1011,
+    "final_train_loss": 0.3688754762818174,
+    "final_val_loss": 0.14595515951514243,
     "model_parameters": 2172358
   },
   "test_metrics": {
@@ -5668,52 +5713,72 @@
       {
         "day": 1,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9317966103553772,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 2,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9318241477012634,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 3,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9325944781303406,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 4,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9324594140052795,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 5,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9320818185806274,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 6,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9312693476676941,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 7,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9321165680885315,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 8,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9314553737640381,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 9,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9331063032150269,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       },
       {
         "day": 10,
         "prediction": "Sabit",
-        "confidence": 0.9897
+        "confidence": 0.9329805374145508,
+        "mid_price": 69.7750015258789,
+        "price_change_pct": 0.0
       }
     ]
   }

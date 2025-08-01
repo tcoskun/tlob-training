@@ -331,6 +331,11 @@ class TLOBIntegration:
             if improvement > min_delta:
                 best_val_loss = avg_val_loss
                 patience_counter = 0
+                
+                # Ensure models directory exists
+                import os
+                os.makedirs('models', exist_ok=True)
+                
                 torch.save(self.model.state_dict(), 'models/best_tlob_model.pth')
                 print(f"✅ New best validation loss: {best_val_loss:.4f} (improvement: {improvement:.4f}) - Model saved!")
                 print(f"   🏆 Best Val Metrics: MAE: {val_metrics['mae']:.4f} | MSE: {val_metrics['mse']:.4f} | MAPE: {val_metrics['mape']:.2f}% | Dir Acc: {val_metrics['direction_accuracy']:.2f}%")
@@ -344,8 +349,13 @@ class TLOBIntegration:
                     break
         
         # Load the best model
-        self.model.load_state_dict(torch.load('models/best_tlob_model.pth'))
-        print(f"📥 Loaded best model with validation loss: {best_val_loss:.4f}")
+        model_path = 'models/best_tlob_model.pth'
+        if os.path.exists(model_path):
+            self.model.load_state_dict(torch.load(model_path))
+            print(f"📥 Loaded best model with validation loss: {best_val_loss:.4f}")
+        else:
+            print(f"⚠️  Model file not found: {model_path}")
+            print("   Using the last trained model state")
         
         return self.history
     
