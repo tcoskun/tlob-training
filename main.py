@@ -162,180 +162,59 @@ def run_tlob_analysis(config):
     return tlob_integration, test_metrics, forecast
 
 def run_portfolio_analysis(config):
-    """Portföy analizi çalıştır"""
-    print("\n📊 PORTFÖY ANALİZİ (LOB Verileri ile)")
+    """Basit portföy analizi çalıştır"""
+    print("\n📊 BASİT PORTFÖY ANALİZİ")
     print("=" * 50)
     
     # Portfolio configuration
     portfolio_config = config.get('portfolio', {})
     data_directory = portfolio_config.get('data_directory', 'data')
-    price_type = portfolio_config.get('price_type', 'Mid_Price')
-    weights = portfolio_config.get('weights', None)
-    rebalance_freq = portfolio_config.get('rebalance_freq', 'H')
+    strategy_type = portfolio_config.get('strategy_type', 'momentum')
+    init_cash = portfolio_config.get('init_cash', 10000)
     
     print(f"📈 Portfolio Analysis Configuration:")
     print(f"   Data Directory: {data_directory}")
-    print(f"   Price Type: {price_type}")
-    print(f"   Rebalancing: {rebalance_freq}")
-    print(f"   Weights: {weights if weights else 'Equal Weight'}")
+    print(f"   Strategy Type: {strategy_type}")
+    print(f"   Initial Cash: {init_cash}")
     
     # Initialize portfolio analyzer
     analyzer = PortfolioAnalyzer(portfolio_config)
     
     # Load LOB data
     print("\n📊 Loading LOB data...")
-    lob_data = analyzer.load_lob_data(data_directory)
+    price_data = analyzer.load_lob_data(data_directory)
     
-    # Create portfolio from LOB data
-    print("\n🏗️ Creating portfolio from LOB data...")
-    portfolio_data = analyzer.create_portfolio_from_lob(price_type=price_type)
-    
-    # Calculate returns
-    print("\n📈 Calculating returns...")
-    returns = analyzer.calculate_returns()
-    
-    # Create portfolio strategy
-    print("\n🏗️ Creating portfolio strategy...")
-    portfolio = analyzer.create_portfolio_strategy(weights, rebalance_freq)
+    # Create portfolio using from_orders
+    print("\n🏗️ Creating portfolio...")
+    portfolio = analyzer.create_portfolio_from_orders(price_data, strategy_type, init_cash)
     
     # Analyze performance
     print("\n📊 Analyzing portfolio performance...")
     try:
-        stats = analyzer.analyze_portfolio_performance()
+        stats = analyzer.analyze_performance()
         
-        # Generate and print report
-        print("\n" + analyzer.generate_portfolio_report())
+        # Print performance report
+        analyzer.print_performance_report(stats)
         
         # Create visualizations
         print("\n📊 Creating portfolio visualizations...")
         try:
-            analyzer.plot_portfolio_analysis('results/portfolio_analysis.png')
+            analyzer.plot_portfolio('results/portfolio_analysis.png')
         except Exception as e:
             print(f"⚠️ Error creating portfolio visualizations: {e}")
         
         # Save results
-        analyzer.save_portfolio_results()
+        analyzer.save_results()
         
     except Exception as e:
         print(f"❌ Error in portfolio analysis: {e}")
         stats = {}
     
-    # Backtest different LOB-based strategies
-    print("\n🔄 Backtesting LOB-based trading strategies...")
-    strategies = portfolio_config.get('strategies', [])
-    
-    strategy_results = {}
-    for strategy_config in strategies:
-        strategy_name = strategy_config['name']
-        strategy_params = strategy_config.get('params', {})
-        
-        print(f"\n📊 Backtesting {strategy_name} strategy...")
-        try:
-            backtest_portfolio = analyzer.backtest_lob_strategy(strategy_name, strategy_params)
-            
-            # Calculate strategy performance with error handling
-            strategy_stats = {}
-            
-            def safe_extract_value(value):
-                """Safely extract value from VectorBT Series or scalar"""
-                try:
-                    if hasattr(value, 'iloc'):
-                        # It's a Series, get the first value
-                        return float(value.iloc[0]) if len(value) > 0 else 0.0
-                    elif hasattr(value, 'item'):
-                        # It's a numpy scalar
-                        return float(value.item())
-                    else:
-                        # It's a regular scalar
-                        return float(value)
-                except:
-                    return 0.0
-            
-            try:
-                strategy_stats['total_return'] = safe_extract_value(backtest_portfolio.total_return())
-            except Exception as e:
-                print(f"⚠️ Error calculating total_return for {strategy_name}: {e}")
-                strategy_stats['total_return'] = 0.0
-                
-            try:
-                strategy_stats['sharpe_ratio'] = safe_extract_value(backtest_portfolio.sharpe_ratio())
-            except Exception as e:
-                print(f"⚠️ Error calculating sharpe_ratio for {strategy_name}: {e}")
-                strategy_stats['sharpe_ratio'] = 0.0
-                
-            try:
-                strategy_stats['max_drawdown'] = safe_extract_value(backtest_portfolio.max_drawdown())
-            except Exception as e:
-                print(f"⚠️ Error calculating max_drawdown for {strategy_name}: {e}")
-                strategy_stats['max_drawdown'] = 0.0
-                
-            # Calculate win rate manually since it's not available in VectorBT
-            try:
-                # Get trade statistics
-                trades = backtest_portfolio.trades
-                if hasattr(trades, 'records') and len(trades.records) > 0:
-                    # Check what columns are available in trade records
-                    available_columns = trades.records.columns.tolist()
-                    print(f"📊 Available trade record columns for {strategy_name}: {available_columns}")
-                    
-                    # Try different possible column names for profit/loss
-                    pnl_column = None
-                    for col in ['PnL', 'pnl', 'profit', 'Profit', 'return', 'Return']:
-                        if col in available_columns:
-                            pnl_column = col
-                            break
-                    
-                    if pnl_column:
-                        # Calculate win rate from trade records
-                        winning_trades = trades.records[trades.records[pnl_column] > 0]
-                        total_trades = len(trades.records)
-                        if total_trades > 0:
-                            strategy_stats['win_rate'] = len(winning_trades) / total_trades
-                        else:
-                            strategy_stats['win_rate'] = 0.0
-                    else:
-                        # If no PnL column found, use returns-based calculation
-                        print(f"⚠️ No PnL column found for {strategy_name}, using returns-based calculation")
-                        strategy_stats['win_rate'] = 0.0
-                else:
-                    # Alternative: calculate from returns
-                    returns = backtest_portfolio.returns()
-                    if hasattr(returns, 'values'):
-                        returns_values = returns.values
-                    else:
-                        returns_values = returns
-                    
-                    if len(returns_values) > 0:
-                        positive_returns = np.sum(returns_values > 0)
-                        strategy_stats['win_rate'] = positive_returns / len(returns_values)
-                    else:
-                        strategy_stats['win_rate'] = 0.0
-            except Exception as e:
-                print(f"⚠️ Error calculating win_rate for {strategy_name}: {e}")
-                strategy_stats['win_rate'] = 0.0
-            
-            strategy_results[strategy_name] = strategy_stats
-            
-            print(f"   {strategy_name} Results:")
-            print(f"     Total Return: {strategy_stats.get('total_return', 0):.2%}")
-            print(f"     Sharpe Ratio: {strategy_stats.get('sharpe_ratio', 0):.2f}")
-            print(f"     Max Drawdown: {strategy_stats.get('max_drawdown', 0):.2%}")
-            print(f"     Win Rate: {strategy_stats.get('win_rate', 0):.2%}")
-            
-        except Exception as e:
-            print(f"❌ Error backtesting {strategy_name}: {e}")
-            strategy_results[strategy_name] = {
-                'total_return': 0.0,
-                'sharpe_ratio': 0.0,
-                'max_drawdown': 0.0,
-                'win_rate': 0.0
-            }
-    
-    return analyzer, portfolio, strategy_results
+    return analyzer, portfolio, stats
 
 def main():
     """Ana çalıştırma fonksiyonu"""
-    print("🚀 TLOB (Time-weighted Limit Order Book) Analysis with Portfolio Analysis")
+    print("🚀 TLOB Model + Portfolio Analysis")
     print("=" * 80)
     
     # Konfigürasyon yükle
@@ -346,10 +225,16 @@ def main():
     os.makedirs('models', exist_ok=True)
     os.makedirs('results', exist_ok=True)
     
-    # Run TLOB analysis
+    # Run TLOB analysis first
+    print("\n" + "="*60)
+    print("🤖 STEP 1: TLOB MODEL ANALYSIS")
+    print("="*60)
     tlob_results = run_tlob_analysis(config)
     
-    # Run Portfolio analysis
+    # Run Portfolio analysis second
+    print("\n" + "="*60)
+    print("📊 STEP 2: PORTFOLIO ANALYSIS")
+    print("="*60)
     portfolio_results = run_portfolio_analysis(config)
     
     print("\n🎉 Complete analysis finished successfully!")

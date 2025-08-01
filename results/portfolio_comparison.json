@@ -1,0 +1,29 @@
+{
+  "strategies": {
+    "momentum": {
+      "total_return": -0.010144520188163187,
+      "sharpe_ratio": -28.928105459440882,
+      "max_drawdown": 0.016388399228235696,
+      "annualized_return": -7.578922117497146,
+      "annualized_volatility": 0.2619916512722638,
+      "win_rate": 0.03909465020576132
+    },
+    "mean_reversion": {
+      "total_return": 0.0,
+      "sharpe_ratio": Infinity,
+      "max_drawdown": NaN,
+      "annualized_return": 0.0,
+      "annualized_volatility": 0.0,
+      "win_rate": 0.0
+    },
+    "random": {
+      "total_return": 0.006414272482190609,
+      "sharpe_ratio": 13.469075770598977,
+      "max_drawdown": 0.0070268930182917745,
+      "annualized_return": 4.838425724722949,
+      "annualized_volatility": 0.3592247758591228,
+      "win_rate": 0.12962962962962962
+    }
+  },
+  "timestamp": "2025-08-01T15:25:12.240516"
+}
