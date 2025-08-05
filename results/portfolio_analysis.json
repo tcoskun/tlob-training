@@ -1,13 +1,13 @@
 {
-  "strategy": "random",
+  "strategy": "mean_reversion",
   "initial_cash": 10000,
   "performance": {
-    "total_return": -0.027476219047482483,
-    "sharpe_ratio": -0.16165757784967547,
-    "max_drawdown": 0.027476219047482663,
-    "annualized_return": -0.027476219047482483,
+    "total_return": 0.06692102750000195,
+    "sharpe_ratio": 0.03546638577227827,
+    "max_drawdown": 0.08430049460586403,
+    "annualized_return": 0.06692102750000195,
     "annualized_volatility": 0.0,
-    "win_rate": 0.00205761316872428
+    "win_rate": 0.2654320987654321
   },
-  "timestamp": "2025-08-05T13:30:46.032359"
+  "timestamp": "2025-08-05T13:42:44.835031"
 }

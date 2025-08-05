@@ -101,36 +101,36 @@ class PortfolioAnalyzer:
         prices = price_data[symbol]
         
         if strategy_type == 'momentum':
-            # Basit momentum strategy
+            # Momentum strategy - daha aktif
             returns = prices.pct_change()
-            # Çok düşük eşikler kullan (daha az trade)
-            decisions = np.where(returns > 0.01, 1,  # Buy on strong positive momentum
-                               np.where(returns < -0.01, -1, 0))  # Sell on strong negative momentum
+            # Daha düşük eşikler kullan (daha fazla trade)
+            decisions = np.where(returns > 0.002, 1,  # Buy on positive momentum
+                               np.where(returns < -0.002, -1, 0))  # Sell on negative momentum
             
         elif strategy_type == 'mean_reversion':
-            # Basit mean reversion strategy
-            ma_long = prices.rolling(20).mean()
-            # Geniş bantlar kullan
-            decisions = np.where(prices > ma_long * 1.03, -1,  # Sell when overbought
-                               np.where(prices < ma_long * 0.97, 1, 0))  # Buy when oversold
+            # Mean reversion strategy - daha aktif
+            ma_long = prices.rolling(10).mean()  # Uzun MA
+            # Daha dar bantlar kullan
+            decisions = np.where(prices > ma_long * 1.005, -1,  # Sell when overbought
+                               np.where(prices < ma_long * 0.995, 1, 0))  # Buy when oversold
             
         elif strategy_type == 'random':
-            # Çok az trade yapan random strategy
+            # Daha aktif random strategy
             np.random.seed(42)
-            # Çok az trade olasılığı
-            decisions = np.random.choice([-1, 0, 1], size=len(prices), p=[0.05, 0.9, 0.05])
+            # Daha fazla trade olasılığı
+            decisions = np.random.choice([-1, 0, 1], size=len(prices), p=[0.15, 0.7, 0.15])
             
         else:
             # Default: hold position
             decisions = np.zeros(len(prices))
         
-        # Trading sıklığını çok azalt - her 10 dakikada bir trade yap
-        if len(decisions) > 20:
-            # İlk 20 veri noktasını koru, sonrasında her 10'da bir trade yap
-            for i in range(20, len(decisions), 10):
+        # Trading sıklığını azalt - her 5 dakikada bir trade yap
+        if len(decisions) > 10:
+            # İlk 10 veri noktasını koru, sonrasında her 5'te bir trade yap
+            for i in range(10, len(decisions), 5):
                 if i < len(decisions):
                     # Diğer noktalarda 0 (hold)
-                    decisions[i+1:i+10] = 0
+                    decisions[i+1:i+5] = 0
         
         # Create decisions DataFrame
         decisions_df = pd.DataFrame(decisions, index=prices.index, columns=[symbol])
@@ -155,14 +155,15 @@ class PortfolioAnalyzer:
         # Create trading decisions
         decisions = self.create_trading_decisions(price_data, strategy_type)
         
-        # Normalize weights (sum to 1 or 0)
-        weights = decisions.div(decisions.abs().sum(axis=1), axis=0).fillna(0)
+        # Mean Reversion (Amount) stratejisini kullan
+        weights = decisions * 500  # 500 birim sabit miktar
+        size_type = 'amount'
         
         # Create portfolio using from_orders with transaction costs
         portfolio = vbt.Portfolio.from_orders(
             close=price_data,
             size=weights,
-            size_type='targetpercent',
+            size_type=size_type,
             init_cash=init_cash,
             freq="1T",
             cash_sharing=True,

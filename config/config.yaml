@@ -42,8 +42,8 @@ portfolio:
   # LOB veri dosyalarından sembol çıkarma
   data_directory: "data"
   
-  # Trading stratejisi
-  strategy_type: "random"  # momentum, mean_reversion, random
+  # Trading stratejisi - En iyi performans gösteren Mean Reversion
+  strategy_type: "mean_reversion"  # momentum, mean_reversion, random
   
   # Başlangıç sermayesi
   init_cash: 10000 
