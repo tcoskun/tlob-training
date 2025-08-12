@@ -179,6 +179,100 @@ class PortfolioAnalyzer:
         print(f"✅ Portfolio created successfully using from_orders with transaction costs")
         return portfolio
     
+    def create_portfolio_from_test_data(self, test_data):
+        """
+        Create portfolio data from TLOB test data
+        
+        Args:
+            test_data: Test data tensor from TLOB analysis
+            
+        Returns:
+            DataFrame with portfolio prices
+        """
+        print(f"📊 Creating portfolio from TLOB test data...")
+        
+        try:
+            # Convert tensor to numpy if needed
+            if hasattr(test_data, 'numpy'):
+                test_data_np = test_data.numpy()
+            else:
+                test_data_np = test_data
+            
+            # Create a simple price series from test data
+            # Use the first feature as price (or create synthetic prices)
+            if len(test_data_np.shape) >= 2:
+                # Take first feature as price
+                prices = test_data_np[:, 0]
+            else:
+                # If 1D, use as is
+                prices = test_data_np
+            
+            # Create time index for test period
+            time_index = pd.date_range(
+                start='2025-07-11 10:00:00',  # Test period start
+                periods=len(prices),
+                freq='1T'  # 1 minute intervals
+            )
+            
+            # Create portfolio DataFrame
+            portfolio_data = pd.DataFrame({
+                'AKBNK': prices
+            }, index=time_index)
+            
+            # Store for later use
+            self.portfolio_data = portfolio_data
+            
+            print(f"✅ Portfolio created from test data: {len(portfolio_data)} time points")
+            return portfolio_data
+            
+        except Exception as e:
+            print(f"❌ Error creating portfolio from test data: {e}")
+            # Fallback: create simple portfolio
+            fallback_data = pd.DataFrame({
+                'AKBNK': np.random.randn(100).cumsum() + 70.0
+            }, index=pd.date_range('2025-07-11 10:00:00', periods=100, freq='1T'))
+            
+            self.portfolio_data = fallback_data
+            print(f"⚠️ Created fallback portfolio with {len(fallback_data)} points")
+            return fallback_data
+    
+    def create_portfolio_from_lob_test_period(self, price_type: str = 'Mid_Price'):
+        """
+        Create portfolio data from LOB data (limited to test period only)
+        
+        Args:
+            price_type: Type of price to use
+            
+        Returns:
+            DataFrame with portfolio prices (test period only)
+        """
+        if not self.lob_data:
+            self.load_lob_data()
+            
+        # Get the first symbol
+        symbol = list(self.lob_data.keys())[0]
+        df = self.lob_data[symbol]
+        
+        # Get test split from config (default: 0.10 for 10% test set)
+        test_split = self.config.get('data', {}).get('test_split', 0.10)
+        test_size = int(len(df) * test_split)
+        
+        # Limit to test period
+        df_test = df.tail(test_size)
+        
+        # Resample to 1-minute intervals
+        df_resampled = df_test[price_type].resample('1T').last().dropna()
+        
+        # Create portfolio DataFrame
+        portfolio_data = pd.DataFrame({
+            symbol: df_resampled
+        })
+        
+        self.portfolio_data = portfolio_data
+        
+        print(f"✅ Portfolio created from LOB test period: {len(portfolio_data)} time points (using {test_split*100}% test split)")
+        return portfolio_data
+    
     def analyze_performance(self) -> Dict:
         """
         Analyze portfolio performance

@@ -161,32 +161,47 @@ def run_tlob_analysis(config):
     
     return tlob_integration, test_metrics, forecast
 
-def run_portfolio_analysis(config):
-    """Basit portföy analizi çalıştır"""
-    print("\n📊 BASİT PORTFÖY ANALİZİ")
+def run_portfolio_analysis(config, test_data=None):
+    """Portföy analizi çalıştır - sadece test seti üzerinde"""
+    print("\n📊 PORTFÖY ANALİZİ (Test Seti Üzerinde)")
     print("=" * 50)
     
     # Portfolio configuration
     portfolio_config = config.get('portfolio', {})
     data_directory = portfolio_config.get('data_directory', 'data')
-    strategy_type = portfolio_config.get('strategy_type', 'momentum')
+    strategy_type = portfolio_config.get('strategy_type', 'mean_reversion')
     init_cash = portfolio_config.get('init_cash', 10000)
     
     print(f"📈 Portfolio Analysis Configuration:")
     print(f"   Data Directory: {data_directory}")
     print(f"   Strategy Type: {strategy_type}")
     print(f"   Initial Cash: {init_cash}")
+    print(f"   Analysis Scope: Test Set Only")
     
     # Initialize portfolio analyzer
     analyzer = PortfolioAnalyzer(portfolio_config)
     
-    # Load LOB data
-    print("\n📊 Loading LOB data...")
-    price_data = analyzer.load_lob_data(data_directory)
+    if test_data is not None:
+        # Use test data from TLOB analysis
+        print("\n📊 Using test data from TLOB analysis...")
+        print(f"   Test data shape: {test_data.shape}")
+        
+        # Create portfolio from test data
+        print("\n🏗️ Creating portfolio from test data...")
+        portfolio_data = analyzer.create_portfolio_from_test_data(test_data)
+        
+    else:
+        # Fallback: Load LOB data but limit to test period
+        print("\n📊 Loading LOB data (limited to test period)...")
+        lob_data = analyzer.load_lob_data(data_directory)
+        
+        # Create portfolio from LOB data (limited to test period)
+        print("\n🏗️ Creating portfolio from LOB data (test period only)...")
+        portfolio_data = analyzer.create_portfolio_from_lob_test_period(price_type='Mid_Price')
     
-    # Create portfolio using from_orders
-    print("\n🏗️ Creating portfolio...")
-    portfolio = analyzer.create_portfolio_from_orders(price_data, strategy_type, init_cash)
+    # Create portfolio using from_orders method
+    print("\n🏗️ Creating portfolio strategy...")
+    portfolio = analyzer.create_portfolio_from_orders(portfolio_data, strategy_type, init_cash)
     
     # Analyze performance
     print("\n📊 Analyzing portfolio performance...")
@@ -199,7 +214,7 @@ def run_portfolio_analysis(config):
         # Create visualizations
         print("\n📊 Creating portfolio visualizations...")
         try:
-            analyzer.plot_portfolio('results/portfolio_analysis.png')
+            analyzer.plot_portfolio('results/portfolio_analysis_test.png')
         except Exception as e:
             print(f"⚠️ Error creating portfolio visualizations: {e}")
         
@@ -227,20 +242,34 @@ def main():
     
     # Run TLOB analysis first
     print("\n" + "="*60)
-    print("🤖 STEP 1: TLOB MODEL ANALYSIS")
+    print("🤖 TLOB ANALYSIS")
     print("="*60)
     tlob_results = run_tlob_analysis(config)
     
-    # Run Portfolio analysis second
+    # Extract test data from TLOB results
+    test_data = None
+    if tlob_results and len(tlob_results) > 0:
+        tlob_integration = tlob_results[0]
+        if hasattr(tlob_integration, 'data_module') and tlob_integration.data_module:
+            # Get test data from TLOB data module
+            try:
+                test_loader = tlob_integration.data_module.test_dataloader()
+                test_batch = next(iter(test_loader))
+                test_data = test_batch[0]  # Get test features
+                print(f"📊 Extracted test data from TLOB: {test_data.shape}")
+            except Exception as e:
+                print(f"⚠️ Could not extract test data from TLOB: {e}")
+    
+    # Run Portfolio analysis
     print("\n" + "="*60)
-    print("📊 STEP 2: PORTFOLIO ANALYSIS")
+    print("📊 PORTFOLIO ANALYSIS")
     print("="*60)
-    portfolio_results = run_portfolio_analysis(config)
+    portfolio_results = run_portfolio_analysis(config, test_data)
     
     print("\n🎉 Complete analysis finished successfully!")
     print("📁 Results saved in 'results/' directory")
     print("💾 Best model saved as 'models/best_tlob_model.pth'")
-    print("📊 Portfolio analysis saved as 'results/portfolio_analysis.json'")
+    print("📊 Portfolio analysis saved as 'results/portfolio_analysis_test.png'")
 
 if __name__ == "__main__":
     main() 

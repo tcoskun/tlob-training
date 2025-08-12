@@ -2,9 +2,9 @@
 data:
   data_dir: "data"
   file_pattern: "*.csv"
-  train_split: 0.72
-  val_split: 0.18
-  test_split: 0.10
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
   random_state: 42
   data_source: "data/2025-07-11-AKBNK-10.csv"
 
