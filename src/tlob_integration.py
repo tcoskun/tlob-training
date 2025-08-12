@@ -19,7 +19,9 @@ class TLOBIntegration:
     
     def __init__(self, config):
         self.config = config
-        self.device = DEVICE
+        # Device ayarını config'den al, fallback olarak TLOB constants'ı kullan
+        # Önce doğrudan 'device' anahtarını ara, sonra 'training.device' ara
+        self.device = self.config.get('device', self.config.get('training', {}).get('device', DEVICE))
         self.model = None
         self.data_module = None
         

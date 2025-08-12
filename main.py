@@ -63,6 +63,8 @@ def run_tlob_analysis(config):
     
     # Initialize TLOB integration
     print("\n🤖 Initializing TLOB model...")
+    print(f"📋 Config device setting: {config['training'].get('device', 'cpu')}")
+    
     tlob_config = {
         'hidden_dim': config['model']['hidden_dim'],
         'num_layers': config['model']['num_layers'],
@@ -74,10 +76,16 @@ def run_tlob_analysis(config):
         'horizon': config['model']['horizon'],
         'forecast_days': config['model']['forecast_days'],
         'early_stopping_patience': config['training']['early_stopping_patience'],
-        'min_delta': config['training'].get('min_delta', 0.001)
+        'min_delta': config['training'].get('min_delta', 0.001),
+        'device': config['training'].get('device', 'cpu')  # Device ayarını ekle
     }
     
+    print(f"🔧 TLOB config device: {tlob_config['device']}")
+    
     tlob_integration = TLOBIntegration(tlob_config)
+    
+    # Device bilgisini göster
+    print(f"🖥️ Using device: {tlob_integration.device}")
     
     # Prepare data for TLOB
     print("🔄 Preparing data for TLOB model...")
