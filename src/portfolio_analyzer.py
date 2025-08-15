@@ -30,61 +30,85 @@ class PortfolioAnalyzer:
         
     def load_lob_data(self, data_dir: str = "data") -> pd.DataFrame:
         """
-        Load LOB data and extract mid prices
+        Load LOB data from all CSV files and extract mid prices
         
         Args:
             data_dir: Directory containing LOB data files
             
         Returns:
-            DataFrame with mid prices
+            DataFrame with mid prices from all files
         """
         print(f"📊 Loading LOB data from {data_dir} directory...")
         
-        # Find CSV files in data directory
+        # Find all CSV files in data directory
         data_files = glob.glob(os.path.join(data_dir, "*.csv"))
         
         if not data_files:
             raise ValueError(f"No CSV files found in {data_dir} directory")
+        
+        print(f"📁 Found {len(data_files)} CSV files")
+        
+        all_dfs = []
+        
+        for file_path in data_files:
+            filename = os.path.basename(file_path)
+            # Extract symbol and date from filename: 2025-08-XX-SYMBOL-10.csv -> SYMBOL_08-XX
+            # Format: 2025-08-05-AKBNK-10.csv -> parts: [2025, 08, 05, AKBNK, 10, csv]
+            if filename.count('-') >= 4:
+                # Extract symbol (4th part) and date (2nd and 3rd parts)
+                symbol_name = filename.split('-')[3]  # AKBNK, THYAO, etc.
+                date_part = filename.split('-')[1] + '-' + filename.split('-')[2]  # 08-05
+                symbol = f'{symbol_name}_{date_part}'
+            elif filename.count('-') >= 2:
+                symbol = filename.split('-')[2]  # Fallback
+            else:
+                symbol = filename.split('.')[0]
             
-        # Load first CSV file
-        file_path = data_files[0]
-        filename = os.path.basename(file_path)
-        symbol = filename.split('-')[1] if '-' in filename else filename.split('.')[0]
+            print(f"📈 Loading {filename} for symbol {symbol}...")
+            
+            # Load LOB data
+            df = pd.read_csv(file_path, sep=';', decimal=',')
+            
+            # Clean column names
+            df.columns = df.columns.str.strip()
+            
+            # Convert numeric columns to float
+            numeric_columns = [col for col in df.columns 
+                              if any(x in col for x in ['Price', 'Volume', 'Ratio', 'mid_price'])]
+            
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Convert DateTime to datetime
+            df['DateTime'] = pd.to_datetime(df['DateTime'])
+            df.set_index('DateTime', inplace=True)
+            
+            # Extract mid price
+            if 'Level 1 Bid Price' in df.columns and 'Level 1 Ask Price' in df.columns:
+                df['Mid_Price'] = (df['Level 1 Bid Price'] + df['Level 1 Ask Price']) / 2
+            elif 'mid_price' in df.columns:
+                df['Mid_Price'] = df['mid_price']
+            else:
+                raise ValueError("No price columns found")
+            
+            # Resample to 1-minute intervals and take first 1000 points for demo
+            df = df.resample('1T').last().fillna(method='ffill')
+            df = df.head(1000)  # Limit to first 1000 points for demo
+            
+            # Rename column to symbol
+            df = df[['Mid_Price']].rename(columns={'Mid_Price': symbol})
+            all_dfs.append(df)
         
-        print(f"📈 Loading {filename} for symbol {symbol}...")
-        
-        # Load LOB data
-        df = pd.read_csv(file_path, sep=';', decimal=',')
-        
-        # Clean column names
-        df.columns = df.columns.str.strip()
-        
-        # Convert numeric columns to float
-        numeric_columns = [col for col in df.columns 
-                          if any(x in col for x in ['Price', 'Volume', 'Ratio', 'mid_price'])]
-        
-        for col in numeric_columns:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Convert DateTime to datetime
-        df['DateTime'] = pd.to_datetime(df['DateTime'])
-        df.set_index('DateTime', inplace=True)
-        
-        # Extract mid price
-        if 'Level 1 Bid Price' in df.columns and 'Level 1 Ask Price' in df.columns:
-            df['Mid_Price'] = (df['Level 1 Bid Price'] + df['Level 1 Ask Price']) / 2
-        elif 'mid_price' in df.columns:
-            df['Mid_Price'] = df['mid_price']
+        # Combine all dataframes
+        if len(all_dfs) > 1:
+            combined_df = pd.concat(all_dfs, axis=1)
+            print(f"✅ Combined data from {len(data_files)} files: {combined_df.shape}")
         else:
-            raise ValueError("No price columns found")
+            combined_df = all_dfs[0]
+            print(f"✅ Loaded single file: {combined_df.shape}")
         
-        # Resample to 1-minute intervals and take first 1000 points for demo
-        df = df.resample('1T').last().fillna(method='ffill')
-        df = df.head(1000)  # Limit to first 1000 points for demo
-        
-        print(f"✅ Loaded {len(df)} price points for {symbol}")
-        return df[['Mid_Price']].rename(columns={'Mid_Price': symbol})
+        return combined_df
     
     def create_trading_decisions(self, price_data: pd.DataFrame, strategy_type: str = 'momentum') -> pd.DataFrame:
         """
@@ -214,15 +238,34 @@ class PortfolioAnalyzer:
                 freq='1T'  # 1 minute intervals
             )
             
-            # Create portfolio DataFrame
-            portfolio_data = pd.DataFrame({
-                'AKBNK': prices
-            }, index=time_index)
+            # Create portfolio DataFrame with multiple symbols
+            # Use available symbols from data directory
+            data_dir = self.config.get('data_directory', 'data')
+            csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
+            symbols = []
+            
+            for csv_file in csv_files:
+                filename = os.path.basename(csv_file)
+                # Extract symbol using same logic as load_lob_data
+                if filename.count('-') >= 4:
+                    symbol_name = filename.split('-')[3]  # AKBNK, THYAO, etc.
+                    date_part = filename.split('-')[1] + '-' + filename.split('-')[2]  # 08-05
+                    symbol = f'{symbol_name}_{date_part}'
+                elif filename.count('-') >= 2:
+                    symbol = filename.split('-')[2]  # Fallback
+                else:
+                    symbol = filename.split('.')[0]
+                symbols.append(symbol)
+            
+            # Create portfolio with all symbols (using same price data for demo)
+            portfolio_data = pd.DataFrame(index=time_index)
+            for symbol in symbols:
+                portfolio_data[symbol] = prices
             
             # Store for later use
             self.portfolio_data = portfolio_data
             
-            print(f"✅ Portfolio created from test data: {len(portfolio_data)} time points")
+            print(f"✅ Portfolio created from test data: {len(portfolio_data)} time points with {len(symbols)} symbols: {symbols}")
             return portfolio_data
             
         except Exception as e:
@@ -246,31 +289,24 @@ class PortfolioAnalyzer:
         Returns:
             DataFrame with portfolio prices (test period only)
         """
-        if not self.lob_data:
-            self.load_lob_data()
+        if not hasattr(self, 'lob_data') or self.lob_data is None:
+            self.lob_data = self.load_lob_data()
             
         # Get the first symbol
-        symbol = list(self.lob_data.keys())[0]
+        symbol = list(self.lob_data.columns)[0]
         df = self.lob_data[symbol]
         
-        # Get test split from config (default: 0.10 for 10% test set)
-        test_split = self.config.get('data', {}).get('test_split', 0.10)
-        test_size = int(len(df) * test_split)
+        # Use all data instead of test split for now
+        print(f"📊 Using all available data: {len(df)} points")
         
-        # Limit to test period
-        df_test = df.tail(test_size)
-        
-        # Resample to 1-minute intervals
-        df_resampled = df_test[price_type].resample('1T').last().dropna()
-        
-        # Create portfolio DataFrame
+        # Create portfolio DataFrame with all data
         portfolio_data = pd.DataFrame({
-            symbol: df_resampled
+            symbol: df
         })
         
         self.portfolio_data = portfolio_data
         
-        print(f"✅ Portfolio created from LOB test period: {len(portfolio_data)} time points (using {test_split*100}% test split)")
+        print(f"✅ Portfolio created from LOB data: {len(portfolio_data)} time points")
         return portfolio_data
     
     def analyze_performance(self) -> Dict:

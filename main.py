@@ -34,28 +34,42 @@ def run_tlob_analysis(config):
     print("\n🤖 TLOB MODEL ANALİZİ")
     print("=" * 50)
     
-    # Find data file
+    # Find all data files
     data_source = config.get('data', {}).get('data_source', 'data/*.csv')
+    
     if data_source.endswith('*.csv'):
-        # Use glob pattern
+        # Use glob pattern to find all CSV files
         data_files = glob.glob(data_source)
         if not data_files:
             print("❌ No CSV files found in data directory!")
             return None
-        data_path = data_files[0]
+        print(f"📊 Found {len(data_files)} CSV files: {[os.path.basename(f) for f in data_files]}")
+        data_paths = data_files
     else:
         # Use specific file path
-        data_path = data_source
-        if not os.path.exists(data_path):
-            print(f"❌ Data file not found: {data_path}")
+        data_paths = [data_source]
+        if not os.path.exists(data_source):
+            print(f"❌ Data file not found: {data_source}")
             return None
     
-    print(f"📊 Loading data from: {data_path}")
+    print(f"📊 Loading data from {len(data_paths)} files...")
     
-    # Load and preprocess data
-    print("\n📈 Loading and preprocessing data...")
-    data_loader = LOBDataLoader(data_path)
-    df = data_loader.load_data()
+    # Load and preprocess data from all files
+    print("\n📈 Loading and preprocessing data from all files...")
+    all_dfs = []
+    for data_path in data_paths:
+        print(f"   📁 Loading: {os.path.basename(data_path)}")
+        data_loader = LOBDataLoader(data_path)
+        df = data_loader.load_data()
+        all_dfs.append(df)
+    
+    # Combine all dataframes
+    if len(all_dfs) > 1:
+        df = pd.concat(all_dfs, ignore_index=True)
+        print(f"✅ Combined data from {len(data_paths)} files")
+    else:
+        df = all_dfs[0]
+        print(f"✅ Loaded single file")
     
     preprocessor = LOBDataPreprocessor()
     
@@ -89,7 +103,7 @@ def run_tlob_analysis(config):
     
     # Prepare data for TLOB
     print("🔄 Preparing data for TLOB model...")
-    num_features = tlob_integration.prepare_data(data_path)
+    num_features = tlob_integration.prepare_data(data_paths)
     print(f"✅ Data prepared with {num_features} features")
     
     # Create and train model

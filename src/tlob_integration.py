@@ -25,24 +25,36 @@ class TLOBIntegration:
         self.model = None
         self.data_module = None
         
-    def prepare_data(self, data_path):
-        """Prepare data for TLOB model"""
-        # Load CSV data
-        df = pd.read_csv(data_path, sep=';', decimal=',')
+    def prepare_data(self, data_paths):
+        """Prepare data for TLOB model from multiple files"""
+        if isinstance(data_paths, str):
+            data_paths = [data_paths]
         
-        # Clean column names (remove extra spaces)
-        df.columns = df.columns.str.strip()
+        all_features = []
         
-        # Convert numeric columns
-        numeric_columns = [col for col in df.columns 
-                          if any(x in col for x in ['Price', 'Volume', 'Ratio'])]
+        for data_path in data_paths:
+            print(f"   🔄 Processing: {os.path.basename(data_path)}")
+            # Load CSV data
+            df = pd.read_csv(data_path, sep=';', decimal=',')
+            
+            # Clean column names (remove extra spaces)
+            df.columns = df.columns.str.strip()
+            
+            # Convert numeric columns
+            numeric_columns = [col for col in df.columns 
+                              if any(x in col for x in ['Price', 'Volume', 'Ratio'])]
+            
+            for col in numeric_columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Convert to TLOB format
+            # TLOB expects specific features based on LOBSTER format
+            file_features = self._extract_tlob_features(df)
+            all_features.extend(file_features)
         
-        for col in numeric_columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Convert to TLOB format
-        # TLOB expects specific features based on LOBSTER format
-        features = self._extract_tlob_features(df)
+        # Combine all features
+        features = np.array(all_features)
+        print(f"   ✅ Combined features from {len(data_paths)} files: {len(features):,} total samples")
         
         # Create sequences
         seq_size = self.config.get('seq_size', 128)

@@ -1,16 +1,13 @@
 {
-  "timestamp": "2025-08-12T17:15:24.031477",
-  "performance_metrics": {
-    "total_return": 0.44350044087694374,
-    "sharpe_ratio": 0.12437878062028403,
-    "max_drawdown": 0.20428288350308538,
-    "annualized_return": 0.44350044087694374,
+  "strategy": "mean_reversion",
+  "initial_cash": 10000,
+  "performance": {
+    "total_return": 0.09483609687499993,
+    "sharpe_ratio": 0.046043465347822006,
+    "max_drawdown": 0.02138100181759075,
+    "annualized_return": 0.09483609687499993,
     "annualized_volatility": 0.0,
-    "win_rate": 0.48
+    "win_rate": 0.03313131313131313
   },
-  "portfolio_info": {
-    "initial_cash": 10000.0,
-    "final_value": 14435.004408769451,
-    "total_trades": 10
-  }
+  "timestamp": "2025-08-15T11:05:14.198404"
 }

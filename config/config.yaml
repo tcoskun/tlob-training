@@ -6,7 +6,7 @@ data:
   val_split: 0.1     # %10 validasyon
   test_split: 0.1    # %10 test
   random_state: 42
-  data_source: "data/2025-07-11-AKBNK-10.csv"
+  data_source: "data/*.csv"
 
 # Model ayarları
 model:
