@@ -113,7 +113,7 @@ class LOBDataPreprocessor:
         output_dir = f"data/{symbol}"
         os.makedirs(output_dir, exist_ok=True)
         
-        lobster_data.to_csv(f"{output_dir}/{symbol}_2025-07-01_2025-07-01_orderbook.csv", 
+        lobster_data.to_csv(f"{output_dir}/{symbol}_orderbook.csv", 
                            index=False, header=False)
         
         print(f"LOBSTER formatında veri kaydedildi: {output_dir}")

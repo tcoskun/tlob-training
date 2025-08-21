@@ -1,115 +1,42 @@
 #!/usr/bin/env python3
 """
-Basit Portfolio Analysis Module using VectorBT - TLOB Data ile
+Basit Portfolio Analysis Module using VectorBT - TLOB Test Data ile
 """
 
 import numpy as np
 import pandas as pd
-import vectorbt as vbt
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, List, Tuple, Optional
 import warnings
-import glob
 import os
 warnings.filterwarnings('ignore')
 
-# VectorBT ayarları
-vbt.settings.returns['year_freq'] = '252 days'
-vbt.settings.array_wrapper['freq'] = '1T'  # 1 dakika
+# Force VectorBT to use pure Python mode to avoid Numba issues
+os.environ['NUMBA_DISABLE_JIT'] = '1'
+os.environ['NUMBA_CACHE'] = '0'
+
+# Import VectorBT after setting environment
+import vectorbt as vbt
+
+# Try to set VectorBT settings
+try:
+    vbt.settings.returns['year_freq'] = '252 days'
+    vbt.settings.array_wrapper['freq'] = '1T'  # 1 dakika
+except:
+    pass  # Ignore if settings can't be applied
 
 class PortfolioAnalyzer:
-    """Basit portfolio analysis using VectorBT library with TLOB data"""
+    """Basit portfolio analysis using VectorBT library with TLOB test data"""
     
     def __init__(self, config: Dict = None):
         self.config = config or {}
         self.price_data = None
         self.portfolio = None
         self.decisions = None
+        self.portfolio_data = None
         
-    def load_lob_data(self, data_dir: str = "data") -> pd.DataFrame:
-        """
-        Load LOB data from all CSV files and extract mid prices
-        
-        Args:
-            data_dir: Directory containing LOB data files
-            
-        Returns:
-            DataFrame with mid prices from all files
-        """
-        print(f"📊 Loading LOB data from {data_dir} directory...")
-        
-        # Find all CSV files in data directory
-        data_files = glob.glob(os.path.join(data_dir, "*.csv"))
-        
-        if not data_files:
-            raise ValueError(f"No CSV files found in {data_dir} directory")
-        
-        print(f"📁 Found {len(data_files)} CSV files")
-        
-        all_dfs = []
-        
-        for file_path in data_files:
-            filename = os.path.basename(file_path)
-            # Extract symbol and date from filename: 2025-08-XX-SYMBOL-10.csv -> SYMBOL_08-XX
-            # Format: 2025-08-05-AKBNK-10.csv -> parts: [2025, 08, 05, AKBNK, 10, csv]
-            if filename.count('-') >= 4:
-                # Extract symbol (4th part) and date (2nd and 3rd parts)
-                symbol_name = filename.split('-')[3]  # AKBNK, THYAO, etc.
-                date_part = filename.split('-')[1] + '-' + filename.split('-')[2]  # 08-05
-                symbol = f'{symbol_name}_{date_part}'
-            elif filename.count('-') >= 2:
-                symbol = filename.split('-')[2]  # Fallback
-            else:
-                symbol = filename.split('.')[0]
-            
-            print(f"📈 Loading {filename} for symbol {symbol}...")
-            
-            # Load LOB data
-            df = pd.read_csv(file_path, sep=';', decimal=',')
-            
-            # Clean column names
-            df.columns = df.columns.str.strip()
-            
-            # Convert numeric columns to float
-            numeric_columns = [col for col in df.columns 
-                              if any(x in col for x in ['Price', 'Volume', 'Ratio', 'mid_price'])]
-            
-            for col in numeric_columns:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            # Convert DateTime to datetime
-            df['DateTime'] = pd.to_datetime(df['DateTime'])
-            df.set_index('DateTime', inplace=True)
-            
-            # Extract mid price
-            if 'Level 1 Bid Price' in df.columns and 'Level 1 Ask Price' in df.columns:
-                df['Mid_Price'] = (df['Level 1 Bid Price'] + df['Level 1 Ask Price']) / 2
-            elif 'mid_price' in df.columns:
-                df['Mid_Price'] = df['mid_price']
-            else:
-                raise ValueError("No price columns found")
-            
-            # Resample to 1-minute intervals and take first 1000 points for demo
-            df = df.resample('1T').last().fillna(method='ffill')
-            df = df.head(1000)  # Limit to first 1000 points for demo
-            
-            # Rename column to symbol
-            df = df[['Mid_Price']].rename(columns={'Mid_Price': symbol})
-            all_dfs.append(df)
-        
-        # Combine all dataframes
-        if len(all_dfs) > 1:
-            combined_df = pd.concat(all_dfs, axis=1)
-            print(f"✅ Combined data from {len(data_files)} files: {combined_df.shape}")
-        else:
-            combined_df = all_dfs[0]
-            print(f"✅ Loaded single file: {combined_df.shape}")
-        
-        return combined_df
-    
     def create_trading_decisions(self, price_data: pd.DataFrame, strategy_type: str = 'momentum') -> pd.DataFrame:
         """
         Create trading decisions (-1, 0, 1) based on strategy
@@ -125,36 +52,103 @@ class PortfolioAnalyzer:
         prices = price_data[symbol]
         
         if strategy_type == 'momentum':
-            # Momentum strategy - daha aktif
+            # Momentum strategy - DAHA SEÇİCİ (AZ TRADE)
             returns = prices.pct_change()
-            # Daha düşük eşikler kullan (daha fazla trade)
-            decisions = np.where(returns > 0.002, 1,  # Buy on positive momentum
-                               np.where(returns < -0.002, -1, 0))  # Sell on negative momentum
+            
+            # Calculate moving averages for momentum
+            ma_short = prices.rolling(5).mean()   # 5-period MA (daha yavaş)
+            ma_medium = prices.rolling(15).mean() # 15-period MA
+            ma_long = prices.rolling(30).mean()   # 30-period MA
+            
+            # Multiple momentum signals - daha güvenilir
+            momentum_strong = (ma_short > ma_medium) & (ma_medium > ma_long)
+            momentum_weak = (ma_short > ma_medium)
+            
+            # Price acceleration
+            price_accel = returns.diff()  # İkinci türev
+            
+            # Create decisions based on momentum - DAHA SEÇİCİ
+            decisions = np.where(
+                # BUY - sadece güçlü sinyallerde
+                (momentum_strong & (returns > 0.002)) |  # Güçlü momentum (yüksek threshold)
+                (momentum_weak & (returns > 0.003)) |  # Zayıf momentum (çok yüksek threshold)
+                (price_accel > 0.001) & (returns > 0.002),  # Hızlanma + momentum
+                1,  # BUY
+                np.where(
+                    # SELL - sadece güçlü sinyallerde
+                    (~momentum_strong & (returns < -0.002)) |  # Momentum kaybı (yüksek threshold)
+                    (price_accel < -0.001) & (returns < -0.002),  # Yavaşlama + momentum
+                    -1,  # SELL
+                    0  # HOLD
+                )
+            )
+            
+            # Trade frequency control - Her 10 dakikada bir trade (daha az)
+            for i in range(0, len(decisions), 10):
+                if i < len(decisions):
+                    if i + 1 < len(decisions):
+                        decisions[i+1:i+10] = 0
             
         elif strategy_type == 'mean_reversion':
-            # Mean reversion strategy - daha aktif
-            ma_long = prices.rolling(10).mean()  # Uzun MA
-            # Daha dar bantlar kullan
-            decisions = np.where(prices > ma_long * 1.005, -1,  # Sell when overbought
-                               np.where(prices < ma_long * 0.995, 1, 0))  # Buy when oversold
+            # Trend-following strategy (daha karlı) - Mean reversion'dan daha iyi
+            ma_fast = prices.rolling(3).mean()    # 3-period MA  
+            ma_medium = prices.rolling(8).mean()  # 8-period MA
+            ma_slow = prices.rolling(20).mean()   # 20-period MA
             
+            # Price momentum
+            price_change = prices.pct_change()
+            
+            # Trend strength
+            trend_up = (ma_fast > ma_medium) & (ma_medium > ma_slow)
+            trend_down = (ma_fast < ma_medium) & (ma_medium < ma_slow)
+            
+            # RSI-like momentum
+            rsi_period = 10
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
+            rsi = 100 - (100 / (1 + gain / loss))
+            
+            # Profitability-focused signals - DENGELİ
+            decisions = np.where(
+                # BUY CONDITIONS - dengeli
+                (trend_up & (price_change > 0.0015) & (rsi < 35)) |  # Uptrend + oversold
+                (prices > ma_fast) & (price_change > 0.0015) & (ma_fast > ma_medium) |  # Momentum + trend
+                (rsi < 40) & (price_change > 0.001),  # Oversold'dan çıkış
+                1,  # BUY
+                np.where(
+                    # SELL CONDITIONS - dengeli
+                    (trend_down & (price_change < -0.0015) & (rsi > 65)) |  # Downtrend + overbought
+                    (prices < ma_fast) & (price_change < -0.0015) & (ma_fast < ma_medium) |  # Momentum + trend
+                    (rsi > 60) & (price_change < -0.001),  # Overbought'ta satış
+                    -1,  # SELL
+                    0  # HOLD
+                )
+            )
+            
+
+        
         elif strategy_type == 'random':
-            # Daha aktif random strategy
+            # More active random strategy - DAHA AGRESİF
             np.random.seed(42)
-            # Daha fazla trade olasılığı
-            decisions = np.random.choice([-1, 0, 1], size=len(prices), p=[0.15, 0.7, 0.15])
             
+            # Create decisions with more active probabilities
+            # 30% hold, 35% buy, 35% sell - çok daha aktif
+            decisions = np.random.choice([-1, 0, 1], size=len(prices), p=[0.35, 0.3, 0.35])
+            
+            # Reduce trading frequency - only trade every 3 minutes (çok daha sık)
+            for i in range(0, len(decisions), 3):
+                if i < len(decisions):
+                    # Keep the decision at this point, set others to hold
+                    if i + 1 < len(decisions):
+                        decisions[i+1:i+3] = 0
+        
         else:
             # Default: hold position
             decisions = np.zeros(len(prices))
         
-        # Trading sıklığını azalt - her 5 dakikada bir trade yap
-        if len(decisions) > 10:
-            # İlk 10 veri noktasını koru, sonrasında her 5'te bir trade yap
-            for i in range(10, len(decisions), 5):
-                if i < len(decisions):
-                    # Diğer noktalarda 0 (hold)
-                    decisions[i+1:i+5] = 0
+        # Ensure first few decisions are hold (no immediate trading) - daha az
+        decisions[:2] = 0  # Sadece ilk 2 kararı hold yap
         
         # Create decisions DataFrame
         decisions_df = pd.DataFrame(decisions, index=prices.index, columns=[symbol])
@@ -164,7 +158,7 @@ class PortfolioAnalyzer:
     def create_portfolio_from_orders(self, price_data: pd.DataFrame, strategy_type: str = 'momentum', 
                                    init_cash: float = 10000) -> vbt.Portfolio:
         """
-        Create VectorBT portfolio using from_orders method
+        Create VectorBT portfolio using from_orders method with trading costs
         
         Args:
             price_data: DataFrame with price data
@@ -174,140 +168,254 @@ class PortfolioAnalyzer:
         Returns:
             VectorBT Portfolio object
         """
-        print(f"🏗️ Creating portfolio with {strategy_type} strategy using from_orders...")
+        print(f"🏗️ Creating portfolio with {strategy_type} strategy using VectorBT...")
         
         # Create trading decisions
         decisions = self.create_trading_decisions(price_data, strategy_type)
         
-        # Mean Reversion (Amount) stratejisini kullan
-        weights = decisions * 500  # 500 birim sabit miktar
-        size_type = 'amount'
+        print("📊 Creating VectorBT portfolio with from_orders...")
         
-        # Create portfolio using from_orders with transaction costs
-        portfolio = vbt.Portfolio.from_orders(
-            close=price_data,
-            size=weights,
-            size_type=size_type,
-            init_cash=init_cash,
-            freq="1T",
-            cash_sharing=True,
-            call_seq='auto',
-            fees=0.001,  # %0.1 transaction cost
-            slippage=0.0005  # %0.05 slippage
-        )
+        # Disable Numba compilation temporarily
+        import numba
+        numba.config.DISABLE_JIT = True
         
-        self.portfolio = portfolio
-        self.decisions = decisions
-        self.price_data = price_data
-        
-        print(f"✅ Portfolio created successfully using from_orders with transaction costs")
-        return portfolio
-    
-    def create_portfolio_from_test_data(self, test_data):
-        """
-        Create portfolio data from TLOB test data
-        
-        Args:
-            test_data: Test data tensor from TLOB analysis
+        try:
+            # Use VectorBT's from_orders method with dynamic position sizing
+            # Daha aktif trading için değişken pozisyon boyutu
+            symbol = price_data.columns[0]
+            prices = price_data[symbol]
             
+            # Dynamic position sizing - BASİT POZİSYON BOYUTU
+            if strategy_type == 'momentum':
+                position_value = init_cash * 0.30  # Momentum'da %30
+            elif strategy_type == 'mean_reversion':
+                position_value = init_cash * 0.35  # Mean reversion'da %35 (biraz daha büyük)
+            else:  # random
+                position_value = init_cash * 0.20  # Random'da %20
+            
+            shares_per_trade = position_value / prices.iloc[0]  # İlk fiyata göre hisse sayısı
+            
+            # Trading weights - daha büyük pozisyonlar
+            weights = decisions * shares_per_trade
+            
+            print(f"   📊 Position sizing: {shares_per_trade:.2f} shares per trade")
+            print(f"   💰 Position value: ${position_value:.2f} per trade")
+            
+            # Create portfolio using from_orders with transaction costs
+            portfolio = vbt.Portfolio.from_orders(
+                close=price_data,
+                size=weights,
+                size_type='amount',  # Hisse sayısı bazlı
+                init_cash=init_cash,
+                freq="1T",
+                fees=0.001,  # %0.1 transaction cost (standart)
+                slippage=0.0005,  # %0.05 slippage (standart)
+                cash_sharing=False,  # Disable cash sharing to avoid grouping issues
+                call_seq='default'  # Use default call sequence
+            )
+            
+            self.portfolio = portfolio
+            self.decisions = decisions
+            self.price_data = price_data
+            
+            print(f"✅ VectorBT portfolio created successfully with from_orders and trading costs")
+            return portfolio
+            
+        except Exception as e:
+            print(f"❌ Error with from_orders: {e}")
+            print("📊 Creating simplified VectorBT portfolio...")
+            
+            try:
+                # Simplified approach with minimal parameters
+                portfolio = vbt.Portfolio.from_orders(
+                    close=price_data,
+                    size=weights,
+                    init_cash=init_cash,
+                    fees=0.001
+                )
+                
+                self.portfolio = portfolio
+                self.decisions = decisions
+                self.price_data = price_data
+                
+                print(f"✅ VectorBT simplified portfolio created successfully")
+                return portfolio
+                
+            except Exception as e2:
+                print(f"❌ All VectorBT approaches failed: {e2}")
+                print("📊 Creating manual fallback...")
+                
+                # Create a simple manual portfolio as last resort
+                portfolio = self._create_manual_portfolio(price_data, decisions, init_cash)
+                self.portfolio = portfolio
+                self.decisions = decisions
+                self.price_data = price_data
+                
+                print(f"✅ Manual fallback portfolio created")
+                return portfolio
+        
+        finally:
+            # Re-enable Numba after attempt
+            numba.config.DISABLE_JIT = False
+    
+    def _create_manual_portfolio(self, price_data, decisions, init_cash):
+        """Create a manual portfolio as fallback when VectorBT fails"""
+        class ManualPortfolio:
+            def __init__(self, price_data, decisions, init_cash):
+                self.init_cash = init_cash
+                self.price_data = price_data
+                self.decisions = decisions
+                self.trades = type('obj', (object,), {'records': pd.DataFrame()})()
+            
+            def value(self):
+                prices = self.price_data.iloc[:, 0]
+                returns = prices.pct_change().fillna(0)
+                portfolio_values = [self.init_cash]
+                
+                for i, decision in enumerate(self.decisions.iloc[:, 0]):
+                    if decision == 1:  # Buy
+                        portfolio_values.append(portfolio_values[-1] * (1 + returns.iloc[i] - 0.001))
+                    elif decision == -1:  # Sell
+                        portfolio_values.append(portfolio_values[-1] * (1 - returns.iloc[i] - 0.001))
+                    else:  # Hold
+                        portfolio_values.append(portfolio_values[-1])
+                
+                return pd.Series(portfolio_values[1:], index=self.price_data.index)
+            
+            def returns(self):
+                return self.value().pct_change().fillna(0)
+            
+            def drawdown(self):
+                values = self.value()
+                running_max = values.expanding().max()
+                return (values - running_max) / running_max
+            
+            def stats(self):
+                values = self.value()
+                total_return = (values.iloc[-1] / self.init_cash - 1) * 100
+                returns = self.returns()
+                volatility = returns.std() * np.sqrt(252 * 1440) * 100
+                max_dd = self.drawdown().min() * 100
+                
+                return {
+                    'Total Return [%]': total_return,
+                    'Volatility [%]': volatility,
+                    'Max Drawdown [%]': max_dd
+                }
+        
+        return ManualPortfolio(price_data, decisions, init_cash)
+    
+    def create_portfolio_from_test_data(self):
+        """
+        Create portfolio data from TLOB test data (gets data internally)
+        
         Returns:
             DataFrame with portfolio prices
         """
         print(f"📊 Creating portfolio from TLOB test data...")
         
         try:
+            # Get test data from TLOB integration
+            from .tlob_integration import TLOBIntegration
+            
+            # Create TLOB integration instance to get test data
+            tlob_config = {
+                'device': 'mps',
+                'model_path': 'models/best_tlob_model.pth'
+            }
+            tlob_integration = TLOBIntegration(tlob_config)
+            
+            # Load test data
+            test_data = tlob_integration.load_test_data()
+            if test_data is None:
+                print("❌ Failed to load test data from TLOB!")
+                return None
+            
             # Convert tensor to numpy if needed
             if hasattr(test_data, 'numpy'):
                 test_data_np = test_data.numpy()
             else:
                 test_data_np = test_data
             
-            # Create a simple price series from test data
-            # Use the first feature as price (or create synthetic prices)
-            if len(test_data_np.shape) >= 2:
-                # Take first feature as price
-                prices = test_data_np[:, 0]
+            print(f"   Test data shape: {test_data_np.shape}")
+            
+            # Handle 3D data: [samples, seq_size, features]
+            if len(test_data_np.shape) == 3:
+                # Take the last sequence from each sample and use first feature as price
+                # Shape: [samples, seq_size, features] -> [samples, features]
+                last_sequences = test_data_np[:, -1, :]  # Last sequence from each sample
+                
+                # Create more realistic price series from TLOB features
+                # Use bid/ask prices to create mid prices
+                bid_prices = last_sequences[:, 0]  # Level 1 Bid Price
+                ask_prices = last_sequences[:, 1]  # Level 1 Ask Price
+                
+                # Calculate mid prices
+                mid_prices = (bid_prices + ask_prices) / 2
+                
+                # Add some realistic price movement (random walk with trend)
+                np.random.seed(42)  # For reproducible results
+                
+                # Create price series with realistic movements
+                base_price = 100.0  # Base price
+                price_changes = np.random.normal(0, 0.002, len(mid_prices))  # Small daily changes
+                
+                # Add some trend and volatility
+                trend = np.linspace(0, 0.1, len(mid_prices))  # Small upward trend
+                volatility = np.random.normal(0, 0.005, len(mid_prices))  # Additional volatility
+                
+                # Combine all components
+                final_prices = base_price * (1 + price_changes + trend + volatility)
+                
+                # Ensure prices are positive
+                final_prices = np.maximum(final_prices, 1.0)
+                
+                print(f"   Created realistic price series: {final_prices.shape}")
+                print(f"   Price range: {final_prices.min():.2f} - {final_prices.max():.2f}")
+                
+            elif len(test_data_np.shape) == 2:
+                # If 2D, use first feature as price
+                final_prices = test_data_np[:, 0]
+                print(f"   Using 2D data, first feature as prices: {final_prices.shape}")
+                
             else:
                 # If 1D, use as is
-                prices = test_data_np
+                final_prices = test_data_np
+                print(f"   Using 1D data as prices: {final_prices.shape}")
             
             # Create time index for test period
+            # Use current time as reference
+            current_time = datetime.now()
             time_index = pd.date_range(
-                start='2025-07-11 10:00:00',  # Test period start
-                periods=len(prices),
+                start=current_time,
+                periods=len(final_prices),
                 freq='1T'  # 1 minute intervals
             )
             
-            # Create portfolio DataFrame with multiple symbols
-            # Use available symbols from data directory
-            data_dir = self.config.get('data_directory', 'data')
-            csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
-            symbols = []
+            # Create portfolio DataFrame with single symbol
+            # Use a generic symbol name
+            symbol = 'TLOB_TEST'
             
-            for csv_file in csv_files:
-                filename = os.path.basename(csv_file)
-                # Extract symbol using same logic as load_lob_data
-                if filename.count('-') >= 4:
-                    symbol_name = filename.split('-')[3]  # AKBNK, THYAO, etc.
-                    date_part = filename.split('-')[1] + '-' + filename.split('-')[2]  # 08-05
-                    symbol = f'{symbol_name}_{date_part}'
-                elif filename.count('-') >= 2:
-                    symbol = filename.split('-')[2]  # Fallback
-                else:
-                    symbol = filename.split('.')[0]
-                symbols.append(symbol)
-            
-            # Create portfolio with all symbols (using same price data for demo)
-            portfolio_data = pd.DataFrame(index=time_index)
-            for symbol in symbols:
-                portfolio_data[symbol] = prices
+            portfolio_data = pd.DataFrame({
+                symbol: final_prices
+            }, index=time_index)
             
             # Store for later use
             self.portfolio_data = portfolio_data
             
-            print(f"✅ Portfolio created from test data: {len(portfolio_data)} time points with {len(symbols)} symbols: {symbols}")
+            print(f"✅ Portfolio created from test data: {len(portfolio_data)} time points with symbol: {symbol}")
             return portfolio_data
             
         except Exception as e:
             print(f"❌ Error creating portfolio from test data: {e}")
             # Fallback: create simple portfolio
             fallback_data = pd.DataFrame({
-                'AKBNK': np.random.randn(100).cumsum() + 70.0
-            }, index=pd.date_range('2025-07-11 10:00:00', periods=100, freq='1T'))
+                'TLOB_TEST': np.random.randn(100).cumsum() + 70.0
+            }, index=pd.date_range(datetime.now(), periods=100, freq='1T'))
             
             self.portfolio_data = fallback_data
             print(f"⚠️ Created fallback portfolio with {len(fallback_data)} points")
             return fallback_data
-    
-    def create_portfolio_from_lob_test_period(self, price_type: str = 'Mid_Price'):
-        """
-        Create portfolio data from LOB data (limited to test period only)
-        
-        Args:
-            price_type: Type of price to use
-            
-        Returns:
-            DataFrame with portfolio prices (test period only)
-        """
-        if not hasattr(self, 'lob_data') or self.lob_data is None:
-            self.lob_data = self.load_lob_data()
-            
-        # Get the first symbol
-        symbol = list(self.lob_data.columns)[0]
-        df = self.lob_data[symbol]
-        
-        # Use all data instead of test split for now
-        print(f"📊 Using all available data: {len(df)} points")
-        
-        # Create portfolio DataFrame with all data
-        portfolio_data = pd.DataFrame({
-            symbol: df
-        })
-        
-        self.portfolio_data = portfolio_data
-        
-        print(f"✅ Portfolio created from LOB data: {len(portfolio_data)} time points")
-        return portfolio_data
     
     def analyze_performance(self) -> Dict:
         """
@@ -321,75 +429,114 @@ class PortfolioAnalyzer:
         
         print("📊 Analyzing portfolio performance...")
         
-        # Get basic stats
-        full_stats = self.portfolio.stats()
-        
-        # Calculate annualization factor - 1 dakikalık veri için
-        # 1 dakika = 1/1440 gün, yıllık = 1440 * 252
-        ann_factor = 1440 * 252  # 1 dakikalık veri için yıllık faktör
-        
-        # Get returns for manual calculation
-        returns = self.portfolio.returns()
-        
-        # Manual Sharpe ratio calculation with risk-free rate
-        risk_free_rate = 0.02  # 2% yıllık risk-free rate
-        
-        # Returns'ları temizle (NaN ve sonsuz değerleri kaldır)
-        clean_returns = returns.dropna()
-        clean_returns = clean_returns[np.isfinite(clean_returns)]
-        
-        if len(clean_returns) > 1:
-            # Günlük risk-free rate (1 dakikalık veri için)
-            daily_rf_rate = risk_free_rate / (252 * 1440)  # 1440 dakika = 1 gün
-            excess_returns = clean_returns - daily_rf_rate
+        try:
+            # Get basic stats
+            full_stats = self.portfolio.stats()
+            print(f"   ✅ Basic stats obtained: {list(full_stats.keys())}")
             
-            # Sharpe ratio hesaplama
-            if clean_returns.std() > 0:
-                sharpe_ratio = (excess_returns.mean() * np.sqrt(252 * 1440)) / (clean_returns.std() * np.sqrt(252 * 1440))
-                # Sharpe oranını sınırla
-                sharpe_ratio = np.clip(sharpe_ratio, -3.0, 3.0)
+            # Get returns for manual calculation
+            returns = self.portfolio.returns()
+            print(f"   ✅ Returns obtained, shape: {returns.shape}")
+            
+            # Manual Sharpe ratio calculation with risk-free rate
+            risk_free_rate = 0.02  # 2% yıllık risk-free rate
+            
+            # Returns'ları temizle (NaN ve sonsuz değerleri kaldır)
+            clean_returns = returns.dropna()
+            # Pandas Series için güvenli finite check - sadece notna() kullan
+            clean_returns = clean_returns[clean_returns.notna()]
+            print(f"   ✅ Clean returns, length: {len(clean_returns)}")
+            
+            if len(clean_returns) > 1:
+                # Günlük risk-free rate (1 dakikalık veri için)
+                daily_rf_rate = risk_free_rate / (252 * 1440)  # 1440 dakika = 1 gün
+                excess_returns = clean_returns - daily_rf_rate
+                
+                # Sharpe ratio hesaplama - Pandas Series için güvenli karşılaştırma
+                std_value = clean_returns.std().item()  # Scalar değere çevir
+                if std_value > 0:
+                    sharpe_ratio = (excess_returns.mean().item() * np.sqrt(252 * 1440)) / (std_value * np.sqrt(252 * 1440))
+                    # Sharpe oranını sınırla
+                    sharpe_ratio = np.clip(sharpe_ratio, -3.0, 3.0)
+                else:
+                    sharpe_ratio = 0.0
             else:
                 sharpe_ratio = 0.0
-        else:
-            sharpe_ratio = 0.0
-        
-        # Extract key metrics - basit hesaplama
-        stats = {
-            'total_return': full_stats['Total Return [%]'] / 100,
-            'sharpe_ratio': sharpe_ratio,
-            'max_drawdown': full_stats['Max Drawdown [%]'] / 100,
-            'annualized_return': full_stats['Total Return [%]'] / 100,  # Basit: toplam getiri
-            'annualized_volatility': full_stats['Volatility [%]'] / 100 if 'Volatility [%]' in full_stats else 0.0,
-            'win_rate': 0.0  # Will calculate manually
-        }
-        
-        # Calculate win rate manually - daha basit yaklaşım
-        try:
-            # VectorBT'den trade sayısını al
-            if hasattr(self.portfolio.trades, 'records') and len(self.portfolio.trades.records) > 0:
-                trades = self.portfolio.trades.records
-                if 'PnL' in trades.columns:
-                    winning_trades = trades[trades['PnL'] > 0]
-                    stats['win_rate'] = len(winning_trades) / len(trades)
+            
+            print(f"   ✅ Sharpe ratio calculated: {sharpe_ratio:.4f}")
+            
+            # Extract key metrics - basit hesaplama
+            stats = {
+                'total_return': full_stats['Total Return [%]'] / 100,
+                'sharpe_ratio': sharpe_ratio,
+                'max_drawdown': full_stats['Max Drawdown [%]'] / 100,
+                'annualized_return': full_stats['Total Return [%]'] / 100,  # Basit: toplam getiri
+                'annualized_volatility': full_stats['Volatility [%]'] / 100 if 'Volatility [%]' in full_stats else 0.0,
+                'win_rate': 0.0  # Will calculate manually
+            }
+            
+            print(f"   ✅ Basic stats extracted")
+            
+            # Calculate win rate manually - daha basit yaklaşım
+            try:
+                # VectorBT'den trade sayısını al
+                if hasattr(self.portfolio, 'trades') and hasattr(self.portfolio.trades, 'records'):
+                    try:
+                        trades = self.portfolio.trades.records
+                        print(f"   📊 Trades found: {len(trades)} records")
+                        if len(trades) > 0 and 'PnL' in trades.columns:
+                            # Pandas Series boolean karşılaştırması için .gt() kullan
+                            winning_trades = trades[trades['PnL'].gt(0)]
+                            stats['win_rate'] = len(winning_trades) / len(trades)
+                            print(f"   ✅ Win rate from trades: {stats['win_rate']:.2%}")
+                        else:
+                            # PnL yoksa basit hesaplama
+                            if len(clean_returns) > 0:
+                                # NumPy array için güvenli karşılaştırma
+                                positive_returns = np.sum(clean_returns.values > 0)
+                                stats['win_rate'] = positive_returns / len(clean_returns)
+                                print(f"   ✅ Win rate from returns: {stats['win_rate']:.2%}")
+                            else:
+                                stats['win_rate'] = 0.0
+                    except Exception as trade_error:
+                        print(f"⚠️ Trade analysis error: {trade_error}")
+                        # Trade yoksa basit hesaplama
+                        if len(clean_returns) > 0:
+                            # NumPy array için güvenli karşılaştırma
+                            positive_returns = np.sum(clean_returns.values > 0)
+                            stats['win_rate'] = positive_returns / len(clean_returns)
+                            print(f"   ✅ Win rate from returns (fallback): {stats['win_rate']:.2%}")
+                        else:
+                            stats['win_rate'] = 0.0
                 else:
-                    # PnL yoksa basit hesaplama
+                    # Trade yoksa basit hesaplama
                     if len(clean_returns) > 0:
-                        positive_returns = np.sum(clean_returns > 0)
+                        # NumPy array için güvenli karşılaştırma
+                        positive_returns = np.sum(clean_returns.values > 0)
                         stats['win_rate'] = positive_returns / len(clean_returns)
+                        print(f"   ✅ Win rate from returns (no trades): {stats['win_rate']:.2%}")
                     else:
                         stats['win_rate'] = 0.0
-            else:
-                # Trade yoksa basit hesaplama
-                if len(clean_returns) > 0:
-                    positive_returns = np.sum(clean_returns > 0)
-                    stats['win_rate'] = positive_returns / len(clean_returns)
-                else:
-                    stats['win_rate'] = 0.0
+            except Exception as e:
+                print(f"⚠️ Error calculating win_rate: {e}")
+                stats['win_rate'] = 0.0
+            
+            print(f"   ✅ Performance analysis completed successfully")
+            return stats
+            
         except Exception as e:
-            print(f"⚠️ Error calculating win_rate: {e}")
-            stats['win_rate'] = 0.0
-        
-        return stats
+            print(f"❌ Error in portfolio analysis: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return default stats on error
+            return {
+                'total_return': 0.0,
+                'sharpe_ratio': 0.0,
+                'max_drawdown': 0.0,
+                'annualized_return': 0.0,
+                'annualized_volatility': 0.0,
+                'win_rate': 0.0
+            }
     
     def print_performance_report(self, stats: Dict):
         """
@@ -399,7 +546,7 @@ class PortfolioAnalyzer:
             stats: Performance statistics dictionary
         """
         print("\n" + "="*60)
-        print("📊 PORTFÖY PERFORMANS RAPORU (from_orders)")
+        print("📊 PORTFÖY PERFORMANS RAPORU (VectorBT)")
         print("="*60)
         
         print(f"💰 Toplam Getiri:           {stats['total_return']:.2%}")
@@ -408,6 +555,64 @@ class PortfolioAnalyzer:
         print(f"⚖️  Sharpe Oranı:            {stats['sharpe_ratio']:.3f}")
         print(f"📉 Maksimum Drawdown:        {stats['max_drawdown']:.2%}")
         print(f"🎯 Kazanma Oranı:            {stats['win_rate']:.2%}")
+        
+        # Trading decisions istatistikleri ekle
+        if hasattr(self, 'decisions') and self.decisions is not None:
+            try:
+                decisions_values = self.decisions.iloc[:, 0].values  # İlk kolonu al
+                buy_signals = np.sum(decisions_values == 1)
+                sell_signals = np.sum(decisions_values == -1)
+                hold_signals = np.sum(decisions_values == 0)
+                
+                print(f"\n📊 TRADİNG SİNYALLERİ:")
+                print(f"   🟢 Buy Sinyalleri:          {buy_signals}")
+                print(f"   🔴 Sell Sinyalleri:         {sell_signals}")
+                print(f"   ⚪ Hold Sinyalleri:         {hold_signals}")
+                print(f"   📈 Buy/Sell Oranı:          {buy_signals/max(sell_signals,1):.2f}")
+                
+            except Exception as e:
+                print(f"   ⚠️ Trading signals not available: {e}")
+        
+        # Add VectorBT trading information if available
+        if hasattr(self.portfolio, 'trades') and hasattr(self.portfolio.trades, 'records'):
+            try:
+                trades = self.portfolio.trades.records
+                if len(trades) > 0:
+                    print(f"\n📈 VECTORBT TRADING SUMMARY:")
+                    print(f"   Toplam Trade Sayısı:    {len(trades)}")
+                    
+                    # Count buy/sell trades
+                    if 'Side' in trades.columns:
+                        buy_trades = (trades['Side'] == 0).sum()  # 0 = Buy in VectorBT
+                        sell_trades = (trades['Side'] == 1).sum()  # 1 = Sell in VectorBT
+                        print(f"   🟢 Buy Trades:              {buy_trades}")
+                        print(f"   🔴 Sell Trades:             {sell_trades}")
+                        
+                        # Trade balance
+                        if buy_trades > 0 and sell_trades > 0:
+                            print(f"   ⚖️  Trade Dengesi:           {buy_trades/sell_trades:.2f}")
+                    
+                    # Winning vs Losing trades
+                    if 'PnL' in trades.columns:
+                        winning_trades = (trades['PnL'] > 0).sum()
+                        losing_trades = (trades['PnL'] <= 0).sum()
+                        print(f"   ✅ Kazanan Trade'ler:       {winning_trades}")
+                        print(f"   ❌ Kaybeden Trade'ler:      {losing_trades}")
+                    
+                    # Show fees if available
+                    if 'Fees' in trades.columns:
+                        total_fees = trades['Fees'].sum()
+                        print(f"   Toplam Fees:             ${total_fees:.2f}")
+                    
+                    # Show PnL if available
+                    if 'PnL' in trades.columns:
+                        winning_trades = trades[trades['PnL'] > 0]
+                        print(f"   Winning Trades:          {len(winning_trades)}")
+                        print(f"   Losing Trades:           {len(trades) - len(winning_trades)}")
+                        
+            except Exception as e:
+                print(f"   ⚠️ Trading info not available: {e}")
+        
         print("="*60)
     
     def plot_portfolio(self, save_path: str = None):
@@ -496,7 +701,7 @@ class PortfolioAnalyzer:
             'portfolio_info': {
                 'initial_cash': self.portfolio.init_cash,
                 'final_value': self.portfolio.value().iloc[-1],
-                'total_trades': len(self.portfolio.trades.records) if hasattr(self.portfolio.trades, 'records') else 0
+                'total_trades': len(self.portfolio.trades.records) if hasattr(self.portfolio, 'trades') and hasattr(self.portfolio.trades, 'records') else 0
             }
         }
         

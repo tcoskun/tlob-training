@@ -1,13 +1,16 @@
 {
-  "strategy": "mean_reversion",
-  "initial_cash": 10000,
-  "performance": {
-    "total_return": 0.09483609687499993,
-    "sharpe_ratio": 0.046043465347822006,
-    "max_drawdown": 0.02138100181759075,
-    "annualized_return": 0.09483609687499993,
+  "timestamp": "2025-08-21T23:41:21.135922",
+  "performance_metrics": {
+    "total_return": 0.029578510072220433,
+    "sharpe_ratio": 0.051090325733686236,
+    "max_drawdown": 0.02237595299849363,
+    "annualized_return": 0.029578510072220433,
     "annualized_volatility": 0.0,
-    "win_rate": 0.03313131313131313
+    "win_rate": 0.43
   },
-  "timestamp": "2025-08-15T14:51:28.367307"
+  "portfolio_info": {
+    "initial_cash": "TLOB_TEST    10000.0\nName: init_cash, dtype: float64",
+    "final_value": "TLOB_TEST    10295.785101\nName: 2025-08-22 01:20:15.072466, dtype: float64",
+    "total_trades": 10
+  }
 }

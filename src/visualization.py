@@ -70,6 +70,12 @@ class LOBVisualizer:
         """
         Eğitim geçmişi - epoch bazında değişim grafikleri
         """
+        # Check if history is available
+        if not hasattr(trainer, 'history') or trainer.history is None:
+            print("⚠️ No training history available for plotting")
+            print("   This is expected when using a pre-trained model")
+            return
+        
         history = trainer.history
         
         # Create subplots for detailed training analysis
