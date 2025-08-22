@@ -1,6 +1,7 @@
 {
-  "timestamp": "2025-08-22T00:51:51.739979",
-  "performance_metrics": {
+  "strategy": "mean_reversion",
+  "initial_cash": 10000,
+  "performance": {
     "total_return": 0.029578510072220433,
     "sharpe_ratio": 0.051090325733686236,
     "max_drawdown": 0.02237595299849363,
@@ -8,9 +9,5 @@
     "annualized_volatility": 0.0,
     "win_rate": 0.43
   },
-  "portfolio_info": {
-    "initial_cash": "TLOB_TEST    10000.0\nName: init_cash, dtype: float64",
-    "final_value": "TLOB_TEST    10295.785101\nName: 2025-08-22 02:30:46.119554, dtype: float64",
-    "total_trades": 10
-  }
+  "timestamp": "2025-08-22T10:30:17.953281"
 }
