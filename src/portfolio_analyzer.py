@@ -467,11 +467,11 @@ class PortfolioAnalyzer:
             
             # Extract key metrics - basit hesaplama
             stats = {
-                'total_return': full_stats['Total Return [%]'] / 100,
+                'total_return': full_stats['Total Return [%]'],
                 'sharpe_ratio': sharpe_ratio,
-                'max_drawdown': full_stats['Max Drawdown [%]'] / 100,
-                'annualized_return': full_stats['Total Return [%]'] / 100,  # Basit: toplam getiri
-                'annualized_volatility': full_stats['Volatility [%]'] / 100 if 'Volatility [%]' in full_stats else 0.0,
+                'max_drawdown': full_stats['Max Drawdown [%]'],
+                'annualized_return': full_stats['Total Return [%]'],  # Basit: toplam getiri
+                'annualized_volatility': full_stats['Volatility [%]'] if 'Volatility [%]' in full_stats else 0.0,
                 'win_rate': 0.0  # Will calculate manually
             }
             
@@ -484,9 +484,9 @@ class PortfolioAnalyzer:
                     try:
                         trades = self.portfolio.trades.records
                         print(f"   📊 Trades found: {len(trades)} records")
-                        if len(trades) > 0 and 'PnL' in trades.columns:
+                        if len(trades) > 0 and 'pnl' in trades.columns:
                             # Pandas Series boolean karşılaştırması için .gt() kullan
-                            winning_trades = trades[trades['PnL'].gt(0)]
+                            winning_trades = trades[trades['pnl'].gt(0)]
                             stats['win_rate'] = len(winning_trades) / len(trades)
                             print(f"   ✅ Win rate from trades: {stats['win_rate']:.2%}")
                         else:
@@ -554,7 +554,6 @@ class PortfolioAnalyzer:
         print(f"📊 Yıllık Volatilite:       {stats['annualized_volatility']:.2%}")
         print(f"⚖️  Sharpe Oranı:            {stats['sharpe_ratio']:.3f}")
         print(f"📉 Maksimum Drawdown:        {stats['max_drawdown']:.2%}")
-        print(f"🎯 Kazanma Oranı:            {stats['win_rate']:.2%}")
         
         # Trading decisions istatistikleri ekle
         if hasattr(self, 'decisions') and self.decisions is not None:
@@ -573,18 +572,54 @@ class PortfolioAnalyzer:
             except Exception as e:
                 print(f"   ⚠️ Trading signals not available: {e}")
         
-        # Add VectorBT trading information if available
         if hasattr(self.portfolio, 'trades') and hasattr(self.portfolio.trades, 'records'):
             try:
                 trades = self.portfolio.trades.records
+                
                 if len(trades) > 0:
                     print(f"\n📈 VECTORBT TRADING SUMMARY:")
                     print(f"   Toplam Trade Sayısı:    {len(trades)}")
                     
+                    # Hit Ratio Metrikleri
+                    if 'pnl' in trades.columns:
+                        winning_trades = (trades['pnl'] > 0).sum()
+                        losing_trades = (trades['pnl'] <= 0).sum()
+                        total_trades = len(trades)
+                        
+                        # Basic Hit Ratio
+                        hit_ratio = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+                        print(f"   🎯 Hit Ratio (Trades-based):    {hit_ratio:.2f}%")
+                        
+                        # Directional Hit Ratio (Trend Accuracy)
+                        if 'direction' in trades.columns:
+                            buy_trades = (trades['direction'] == 0).sum()  # 0 = Buy in VectorBT
+                            sell_trades = (trades['direction'] == 1).sum()  # 1 = Sell in VectorBT
+                            
+                            if buy_trades > 0:
+                                buy_wins = trades[(trades['direction'] == 0) & (trades['pnl'] > 0)].shape[0]
+                                buy_hit_ratio = (buy_wins / buy_trades * 100) if buy_trades > 0 else 0
+                                print(f"   🟢 Buy Hit Ratio:           {buy_hit_ratio:.2f}% ({buy_wins}/{buy_trades})")
+                            
+                            if sell_trades > 0:
+                                sell_wins = trades[(trades['direction'] == 1) & (trades['pnl'] > 0)].shape[0]
+                                sell_hit_ratio = (sell_wins / sell_trades * 100) if sell_trades > 0 else 0
+                                print(f"   🔴 Sell Hit Ratio:          {sell_hit_ratio:.2f}% ({sell_wins}/{sell_trades})")
+                        
+                        # Risk-Adjusted Hit Ratio
+                        if winning_trades > 0 and losing_trades > 0:
+                            avg_win = trades[trades['pnl'] > 0]['pnl'].mean()
+                            avg_loss = abs(trades[trades['pnl'] <= 0]['pnl'].mean())
+                            risk_ratio = avg_win / avg_loss if avg_loss > 0 else 0
+                            print(f"   ⚖️  Risk-Reward Ratio:        {risk_ratio:.2f}")
+                        
+                        # Hit Ratio Quality Score
+                        quality_score = (hit_ratio * 0.4) + (min(risk_ratio, 3) * 20) if 'risk_ratio' in locals() else hit_ratio
+                        print(f"   🏆 Hit Ratio Quality Score: {quality_score:.1f}/100")
+                    
                     # Count buy/sell trades
-                    if 'Side' in trades.columns:
-                        buy_trades = (trades['Side'] == 0).sum()  # 0 = Buy in VectorBT
-                        sell_trades = (trades['Side'] == 1).sum()  # 1 = Sell in VectorBT
+                    if 'direction' in trades.columns:
+                        buy_trades = (trades['direction'] == 0).sum()  # 0 = Buy in VectorBT
+                        sell_trades = (trades['direction'] == 1).sum()  # 1 = Sell in VectorBT
                         print(f"   🟢 Buy Trades:              {buy_trades}")
                         print(f"   🔴 Sell Trades:             {sell_trades}")
                         
@@ -593,20 +628,30 @@ class PortfolioAnalyzer:
                             print(f"   ⚖️  Trade Dengesi:           {buy_trades/sell_trades:.2f}")
                     
                     # Winning vs Losing trades
-                    if 'PnL' in trades.columns:
-                        winning_trades = (trades['PnL'] > 0).sum()
-                        losing_trades = (trades['PnL'] <= 0).sum()
+                    if 'pnl' in trades.columns:
+                        winning_trades = (trades['pnl'] > 0).sum()
+                        losing_trades = (trades['pnl'] <= 0).sum()
                         print(f"   ✅ Kazanan Trade'ler:       {winning_trades}")
                         print(f"   ❌ Kaybeden Trade'ler:      {losing_trades}")
                     
                     # Show fees if available
-                    if 'Fees' in trades.columns:
-                        total_fees = trades['Fees'].sum()
-                        print(f"   Toplam Fees:             ${total_fees:.2f}")
+                    if 'entry_fees' in trades.columns and 'exit_fees' in trades.columns:
+                        entry_fees = trades['entry_fees'].sum()
+                        exit_fees = trades['exit_fees'].sum()
+                        total_fees = entry_fees + exit_fees
+                        print(f"   📊 Entry Fees:            {entry_fees:.2f}")
+                        print(f"   📊 Exit Fees:             {exit_fees:.2f}")
+                        print(f"   💰 Toplam Fees:           {total_fees:.2f}")
+                        
+                        # Fee breakdown per trade
+                        avg_entry_fee = entry_fees / len(trades) if len(trades) > 0 else 0
+                        avg_exit_fee = exit_fees / len(trades) if len(trades) > 0 else 0
+                        print(f"   📈 Ortalama Entry Fee:    {avg_entry_fee:.2f}")
+                        print(f"   📈 Ortalama Exit Fee:     {avg_exit_fee:.2f}")
                     
                     # Show PnL if available
-                    if 'PnL' in trades.columns:
-                        winning_trades = trades[trades['PnL'] > 0]
+                    if 'pnl' in trades.columns:
+                        winning_trades = trades[trades['pnl'] > 0]
                         print(f"   Winning Trades:          {len(winning_trades)}")
                         print(f"   Losing Trades:           {len(trades) - len(winning_trades)}")
                         
