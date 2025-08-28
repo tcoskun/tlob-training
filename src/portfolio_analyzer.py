@@ -508,11 +508,11 @@ class PortfolioAnalyzer:
         print("📊 PORTFÖY PERFORMANS RAPORU (VectorBT)")
         print("="*60)
         
-        print(f"💰 Toplam Getiri:           {stats['total_return']:.2%}")
-        print(f"📈 Yıllık Getiri:           {stats['annualized_return']:.2%}")
-        print(f"📊 Yıllık Volatilite:       {stats['annualized_volatility']:.2%}")
+        print(f"💰 Toplam Getiri:           {stats['total_return']/100:.2%}")
+        print(f"📈 Yıllık Getiri:           {stats['annualized_return']/100:.2%}")
+        print(f"📊 Yıllık Volatilite:       {stats['annualized_volatility']/100:.2%}")
         print(f"⚖️  Sharpe Oranı:            {stats['sharpe_ratio']:.3f}")
-        print(f"📉 Maksimum Drawdown:        {stats['max_drawdown']:.2%}")
+        print(f"📉 Maksimum Drawdown:        {stats['max_drawdown']/100:.2%}")
         
         # Trading decisions istatistikleri ekle
         if hasattr(self, 'decisions') and self.decisions is not None:
