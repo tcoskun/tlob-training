@@ -219,6 +219,8 @@ class PortfolioAnalyzer:
             self.price_data = price_data
             
             print(f"✅ VectorBT portfolio created successfully with from_orders and trading costs")
+            print(f"   📊 Data stored - Price: {self.price_data.shape if self.price_data is not None else 'None'}")
+            print(f"   📊 Data stored - Decisions: {self.decisions.shape if self.decisions is not None else 'None'}")
             return portfolio
             
         except Exception as e:
@@ -239,6 +241,8 @@ class PortfolioAnalyzer:
                 self.price_data = price_data
                 
                 print(f"✅ VectorBT simplified portfolio created successfully")
+                print(f"   📊 Data stored - Price: {self.price_data.shape if self.price_data is not None else 'None'}")
+                print(f"   📊 Data stored - Decisions: {self.decisions.shape if self.decisions is not None else 'None'}")
                 return portfolio
                 
             except Exception as e2:
@@ -252,6 +256,8 @@ class PortfolioAnalyzer:
                 self.price_data = price_data
                 
                 print(f"✅ Manual fallback portfolio created")
+                print(f"   📊 Data stored - Price: {self.price_data.shape if self.price_data is not None else 'None'}")
+                print(f"   📊 Data stored - Decisions: {self.decisions.shape if self.decisions is not None else 'None'}")
                 return portfolio
         
         finally:
@@ -615,7 +621,7 @@ class PortfolioAnalyzer:
     
     def plot_portfolio(self, save_path: str = None):
         """
-        Plot portfolio performance
+        Plot portfolio performance with improved layout
         
         Args:
             save_path: Path to save plot
@@ -625,53 +631,176 @@ class PortfolioAnalyzer:
         
         print("📊 Creating portfolio plots...")
         
-        # Set up plotting style
-        sns.set_style('darkgrid')
-        plt.figure(figsize=(15, 10))
+        # Set up plotting style and clear any existing plots
+        plt.style.use('default')
+        plt.close('all')
         
-        # Plot 1: Portfolio Value
-        plt.subplot(2, 2, 1)
-        self.portfolio.value().plot()
-        plt.title('Portfolio Value Over Time')
-        plt.ylabel('Portfolio Value')
-        plt.grid(True, alpha=0.3)
+        # Create figure with better spacing
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle('Portfolio Analysis Dashboard', fontsize=16, fontweight='bold')
         
-        # Plot 2: Returns
-        plt.subplot(2, 2, 2)
-        self.portfolio.returns().plot()
-        plt.title('Portfolio Returns')
-        plt.ylabel('Returns')
-        plt.grid(True, alpha=0.3)
+        try:
+            # Plot 1: Portfolio Value Over Time
+            ax1 = axes[0, 0]
+            try:
+                portfolio_value = self.portfolio.value()
+                if portfolio_value is not None and len(portfolio_value) > 0:
+                    # Ensure it's a 1D series
+                    if hasattr(portfolio_value, 'iloc'):
+                        if len(portfolio_value.shape) > 1 and portfolio_value.shape[1] > 1:
+                            portfolio_value = portfolio_value.iloc[:, 0]  # Take first column
+                    
+                    ax1.plot(portfolio_value.index, portfolio_value.values, color='green', linewidth=2)
+                    ax1.set_title('Portfolio Value Over Time', fontweight='bold')
+                    ax1.set_ylabel('Portfolio Value ($)')
+                    ax1.grid(True, alpha=0.3)
+                    ax1.tick_params(axis='x', rotation=45)
+                else:
+                    ax1.text(0.5, 0.5, 'Portfolio Value Data\nNot Available', 
+                            ha='center', va='center', transform=ax1.transAxes, fontsize=12)
+                    ax1.set_title('Portfolio Value Over Time', fontweight='bold')
+            except Exception as e:
+                print(f"      ❌ Error plotting portfolio value: {e}")
+                ax1.text(0.5, 0.5, f'Portfolio Value\nError: {str(e)[:50]}...', 
+                        ha='center', va='center', transform=ax1.transAxes, fontsize=10)
+                ax1.set_title('Portfolio Value Over Time', fontweight='bold')
+            
+            # Plot 2: Portfolio Returns
+            ax2 = axes[0, 1] 
+            try:
+                returns = self.portfolio.returns()
+                if returns is not None and len(returns) > 0:
+                    # Ensure it's a 1D series
+                    if hasattr(returns, 'iloc'):
+                        if len(returns.shape) > 1 and returns.shape[1] > 1:
+                            returns = returns.iloc[:, 0]  # Take first column
+                    
+                    ax2.plot(returns.index, returns.values, color='blue', alpha=0.7, linewidth=1)
+                    ax2.set_title('Portfolio Returns', fontweight='bold')
+                    ax2.set_ylabel('Returns')
+                    ax2.grid(True, alpha=0.3)
+                    ax2.tick_params(axis='x', rotation=45)
+                    # Add zero line for reference
+                    ax2.axhline(y=0, color='red', linestyle='--', alpha=0.5)
+                else:
+                    ax2.text(0.5, 0.5, 'Returns Data\nNot Available', 
+                            ha='center', va='center', transform=ax2.transAxes, fontsize=12)
+                    ax2.set_title('Portfolio Returns', fontweight='bold')
+            except Exception as e:
+                print(f"      ❌ Error plotting returns: {e}")
+                ax2.text(0.5, 0.5, f'Returns\nError: {str(e)[:50]}...', 
+                        ha='center', va='center', transform=ax2.transAxes, fontsize=10)
+                ax2.set_title('Portfolio Returns', fontweight='bold')
+            
+            # Plot 3: Drawdown
+            ax3 = axes[1, 0]
+            try:
+                drawdown = self.portfolio.drawdown()
+                if drawdown is not None and len(drawdown) > 0:
+                    # Ensure it's a 1D series
+                    if hasattr(drawdown, 'iloc'):
+                        if len(drawdown.shape) > 1 and drawdown.shape[1] > 1:
+                            drawdown = drawdown.iloc[:, 0]  # Take first column
+                    
+                    ax3.plot(drawdown.index, drawdown.values, color='red', linewidth=2, alpha=0.8)
+                    ax3.fill_between(drawdown.index, drawdown.values, 0, alpha=0.3, color='red')
+                    ax3.set_title('Portfolio Drawdown', fontweight='bold')
+                    ax3.set_ylabel('Drawdown (%)')
+                    ax3.grid(True, alpha=0.3)
+                    ax3.tick_params(axis='x', rotation=45)
+                else:
+                    ax3.text(0.5, 0.5, 'Drawdown Data\nNot Available', 
+                            ha='center', va='center', transform=ax3.transAxes, fontsize=12)
+                    ax3.set_title('Portfolio Drawdown', fontweight='bold')
+            except Exception as e:
+                ax3.text(0.5, 0.5, f'Drawdown\nError: {str(e)[:50]}...', 
+                        ha='center', va='center', transform=ax3.transAxes, fontsize=10)
+                ax3.set_title('Portfolio Drawdown', fontweight='bold')
+            
+            # Plot 4: Price vs Trading Decisions (with debugging)
+            ax4 = axes[1, 1]
+            
+            if self.price_data is not None and self.decisions is not None and len(self.price_data) > 0:
+                try:
+                    # Plot price on primary axis - using matplotlib plot directly
+                    price_color = 'blue'
+                    price_series = self.price_data.iloc[:, 0]  # Get first column as series
+                    ax4.plot(price_series.index, price_series.values, color=price_color, alpha=0.8, linewidth=2)
+                    ax4.set_ylabel('Price ($)', color=price_color)
+                    ax4.tick_params(axis='y', labelcolor=price_color)
+                    ax4.tick_params(axis='x', rotation=45)
+                    
+                    print(f"      ✅ Price plot successful")
+                    
+                    # Create secondary axis for trading decisions
+                    ax4_twin = ax4.twinx()
+                    
+                    # Plot trading decisions as scatter points to avoid line overlap
+                    decisions_values = self.decisions.iloc[:, 0]
+                    buy_signals = decisions_values[decisions_values == 1]
+                    sell_signals = decisions_values[decisions_values == -1]
+                    hold_signals = decisions_values[decisions_values == 0]
+                    
+                    # Plot all decision points for better visualization
+                    if len(buy_signals) > 0:
+                        ax4_twin.scatter(buy_signals.index, buy_signals.values, 
+                                       color='green', marker='^', s=60, alpha=0.9, label='Buy', zorder=5)
+                        print(f"      ✅ Buy signals plotted: {len(buy_signals)}")
+                    
+                    if len(sell_signals) > 0:
+                        ax4_twin.scatter(sell_signals.index, sell_signals.values, 
+                                       color='red', marker='v', s=60, alpha=0.9, label='Sell', zorder=5)
+                        print(f"      ✅ Sell signals plotted: {len(sell_signals)}")
+                    
+                    # Also plot hold signals as small dots for reference
+                    if len(hold_signals) > 0:
+                        ax4_twin.scatter(hold_signals.index, hold_signals.values, 
+                                       color='gray', marker='o', s=10, alpha=0.3, label='Hold', zorder=3)
+                        print(f"      ✅ Hold signals plotted: {len(hold_signals)}")
+                    
+                    decision_color = 'darkred'
+                    ax4_twin.set_ylabel('Trading Signals', color=decision_color)
+                    ax4_twin.tick_params(axis='y', labelcolor=decision_color)
+                    ax4_twin.set_ylim(-1.5, 1.5)
+                    ax4_twin.set_yticks([-1, 0, 1])
+                    ax4_twin.set_yticklabels(['Sell', 'Hold', 'Buy'])
+                    
+                    # Add legend
+                    if len(buy_signals) > 0 or len(sell_signals) > 0:
+                        ax4_twin.legend(loc='upper right')
+                    
+                    ax4.set_title('Price vs Trading Decisions', fontweight='bold')
+                    ax4.grid(True, alpha=0.3)
+                    
+                    print(f"      ✅ Plot 4 completed successfully")
+                    
+                except Exception as plot_error:
+                    print(f"      ❌ Error plotting Price vs Decisions: {plot_error}")
+                    ax4.text(0.5, 0.5, f'Plotting Error:\n{str(plot_error)}', 
+                            ha='center', va='center', transform=ax4.transAxes, fontsize=10)
+                    ax4.set_title('Price vs Trading Decisions (Error)', fontweight='bold')
+            else:
+                reason = "Unknown"
+                if self.price_data is None:
+                    reason = "Price data is None"
+                elif self.decisions is None:
+                    reason = "Decisions data is None"
+                elif len(self.price_data) == 0:
+                    reason = "Price data is empty"
+                
+                print(f"      ❌ Cannot plot: {reason}")
+                ax4.text(0.5, 0.5, f'Price vs Trading Decisions\nNot Available\n\nReason: {reason}', 
+                        ha='center', va='center', transform=ax4.transAxes, fontsize=12)
+                ax4.set_title('Price vs Trading Decisions', fontweight='bold')
+            
+        except Exception as e:
+            print(f"⚠️ Error creating some plots: {e}")
         
-        # Plot 3: Drawdown
-        plt.subplot(2, 2, 3)
-        self.portfolio.drawdown().plot()
-        plt.title('Portfolio Drawdown')
-        plt.ylabel('Drawdown')
-        plt.grid(True, alpha=0.3)
-        
-        # Plot 4: Price vs Decisions
-        plt.subplot(2, 2, 4)
-        ax1 = plt.gca()
-        ax2 = ax1.twinx()
-        
-        # Plot price
-        self.price_data.plot(ax=ax1, color='blue', alpha=0.7)
-        ax1.set_ylabel('Price', color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
-        
-        # Plot decisions
-        self.decisions.plot(ax=ax2, color='red', alpha=0.7)
-        ax2.set_ylabel('Trading Decisions', color='red')
-        ax2.tick_params(axis='y', labelcolor='red')
-        
-        plt.title('Price vs Trading Decisions')
-        plt.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
+        # Adjust layout to prevent overlap
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"📊 Plot saved to {save_path}")
         
         plt.show()
