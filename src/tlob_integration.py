@@ -63,9 +63,9 @@ class TLOBIntegration:
         horizon = self.config.get('horizon', 10)
         
         # Split data
-        train_split = self.config.get('data', {}).get('train_split', 0.8)
+        train_split = self.config.get('data', {}).get('train_split', 0.5)
         val_split = self.config.get('data', {}).get('val_split', 0.1)
-        test_split = self.config.get('data', {}).get('test_split', 0.1)
+        test_split = self.config.get('data', {}).get('test_split', 0.4)
         
         train_size = int(train_split * len(features))
         val_size = int(val_split * len(features))

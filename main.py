@@ -212,9 +212,7 @@ def run_portfolio_analysis(config):
     # Create portfolio using from_orders method
     print("\n🏗️ Creating portfolio strategy...")
     portfolio = analyzer.create_portfolio_from_orders(portfolio_data, strategy_type, init_cash)
-    
-    # Analyze performance
-    print("\n📊 Analyzing portfolio performance...")
+
     try:
         stats = analyzer.analyze_performance()
         

@@ -474,53 +474,6 @@ class PortfolioAnalyzer:
                 'annualized_volatility': full_stats['Volatility [%]'] if 'Volatility [%]' in full_stats else 0.0,
                 'win_rate': 0.0  # Will calculate manually
             }
-            
-            print(f"   ✅ Basic stats extracted")
-            
-            # Calculate win rate manually - daha basit yaklaşım
-            try:
-                # VectorBT'den trade sayısını al
-                if hasattr(self.portfolio, 'trades') and hasattr(self.portfolio.trades, 'records'):
-                    try:
-                        trades = self.portfolio.trades.records
-                        print(f"   📊 Trades found: {len(trades)} records")
-                        if len(trades) > 0 and 'pnl' in trades.columns:
-                            # Pandas Series boolean karşılaştırması için .gt() kullan
-                            winning_trades = trades[trades['pnl'].gt(0)]
-                            stats['win_rate'] = len(winning_trades) / len(trades)
-                            print(f"   ✅ Win rate from trades: {stats['win_rate']:.2%}")
-                        else:
-                            # PnL yoksa basit hesaplama
-                            if len(clean_returns) > 0:
-                                # NumPy array için güvenli karşılaştırma
-                                positive_returns = np.sum(clean_returns.values > 0)
-                                stats['win_rate'] = positive_returns / len(clean_returns)
-                                print(f"   ✅ Win rate from returns: {stats['win_rate']:.2%}")
-                            else:
-                                stats['win_rate'] = 0.0
-                    except Exception as trade_error:
-                        print(f"⚠️ Trade analysis error: {trade_error}")
-                        # Trade yoksa basit hesaplama
-                        if len(clean_returns) > 0:
-                            # NumPy array için güvenli karşılaştırma
-                            positive_returns = np.sum(clean_returns.values > 0)
-                            stats['win_rate'] = positive_returns / len(clean_returns)
-                            print(f"   ✅ Win rate from returns (fallback): {stats['win_rate']:.2%}")
-                        else:
-                            stats['win_rate'] = 0.0
-                else:
-                    # Trade yoksa basit hesaplama
-                    if len(clean_returns) > 0:
-                        # NumPy array için güvenli karşılaştırma
-                        positive_returns = np.sum(clean_returns.values > 0)
-                        stats['win_rate'] = positive_returns / len(clean_returns)
-                        print(f"   ✅ Win rate from returns (no trades): {stats['win_rate']:.2%}")
-                    else:
-                        stats['win_rate'] = 0.0
-            except Exception as e:
-                print(f"⚠️ Error calculating win_rate: {e}")
-                stats['win_rate'] = 0.0
-            
             print(f"   ✅ Performance analysis completed successfully")
             return stats
             
