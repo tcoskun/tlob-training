@@ -90,10 +90,10 @@ class PortfolioAnalyzer:
                         decisions[i+1:i+10] = 0
             
         elif strategy_type == 'mean_reversion':
-            # Trend-following strategy (daha karlı) - Mean reversion'dan daha iyi
-            ma_fast = prices.rolling(3).mean()    # 3-period MA  
-            ma_medium = prices.rolling(8).mean()  # 8-period MA
-            ma_slow = prices.rolling(20).mean()   # 20-period MA
+            # Optimized for MORE TRADES - Daha hızlı MA'lar
+            ma_fast = prices.rolling(2).mean()    # 2-period MA (daha hızlı)
+            ma_medium = prices.rolling(5).mean()  # 5-period MA (daha hızlı)
+            ma_slow = prices.rolling(10).mean()   # 10-period MA (daha hızlı)
             
             # Price momentum
             price_change = prices.pct_change()
@@ -102,25 +102,29 @@ class PortfolioAnalyzer:
             trend_up = (ma_fast > ma_medium) & (ma_medium > ma_slow)
             trend_down = (ma_fast < ma_medium) & (ma_medium < ma_slow)
             
-            # RSI-like momentum
-            rsi_period = 10
+            # RSI-like momentum - Daha hızlı RSI
+            rsi_period = 5  # Daha kısa periyot, daha hızlı sinyaller
             delta = prices.diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
             rsi = 100 - (100 / (1 + gain / loss))
             
-            # Profitability-focused signals - DENGELİ
+            # Optimized signals for MORE TRADES - DAHA AKTİF
             decisions = np.where(
-                # BUY CONDITIONS - dengeli
-                (trend_up & (price_change > 0.0015) & (rsi < 35)) |  # Uptrend + oversold
-                (prices > ma_fast) & (price_change > 0.0015) & (ma_fast > ma_medium) |  # Momentum + trend
-                (rsi < 40) & (price_change > 0.001),  # Oversold'dan çıkış
+                # BUY CONDITIONS - daha düşük threshold'lar
+                (trend_up & (price_change > 0.0005)) |  # Uptrend + çok düşük pozitif hareket
+                (prices > ma_fast) & (price_change > 0.0005) |  # Basit momentum
+                (rsi < 50) & (price_change > 0.0003) |  # RSI 50 altında pozitif hareket
+                (ma_fast > ma_medium) & (price_change > 0.0004) |  # MA crossover + pozitif
+                (price_change > 0.0008),  # Herhangi güçlü pozitif hareket
                 1,  # BUY
                 np.where(
-                    # SELL CONDITIONS - dengeli
-                    (trend_down & (price_change < -0.0015) & (rsi > 65)) |  # Downtrend + overbought
-                    (prices < ma_fast) & (price_change < -0.0015) & (ma_fast < ma_medium) |  # Momentum + trend
-                    (rsi > 60) & (price_change < -0.001),  # Overbought'ta satış
+                    # SELL CONDITIONS - daha düşük threshold'lar
+                    (trend_down & (price_change < -0.0005)) |  # Downtrend + çok düşük negatif hareket
+                    (prices < ma_fast) & (price_change < -0.0005) |  # Basit momentum
+                    (rsi > 50) & (price_change < -0.0003) |  # RSI 50 üzerinde negatif hareket
+                    (ma_fast < ma_medium) & (price_change < -0.0004) |  # MA crossover + negatif
+                    (price_change < -0.0008),  # Herhangi güçlü negatif hareket
                     -1,  # SELL
                     0  # HOLD
                 )
@@ -189,7 +193,7 @@ class PortfolioAnalyzer:
             if strategy_type == 'momentum':
                 position_value = init_cash * 0.30  # Momentum'da %30
             elif strategy_type == 'mean_reversion':
-                position_value = init_cash * 0.25  # Mean reversion'da %35 (biraz daha büyük)
+                position_value = init_cash * 0.15  # Mean reversion'da %35 (biraz daha büyük)
             else:  # random
                 position_value = init_cash * 0.20  # Random'da %20
             
