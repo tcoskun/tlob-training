@@ -189,7 +189,7 @@ class PortfolioAnalyzer:
             if strategy_type == 'momentum':
                 position_value = init_cash * 0.30  # Momentum'da %30
             elif strategy_type == 'mean_reversion':
-                position_value = init_cash * 0.35  # Mean reversion'da %35 (biraz daha büyük)
+                position_value = init_cash * 0.25  # Mean reversion'da %35 (biraz daha büyük)
             else:  # random
                 position_value = init_cash * 0.20  # Random'da %20
             
