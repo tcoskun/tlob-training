@@ -2,12 +2,12 @@
   "strategy": "mean_reversion",
   "initial_cash": 10000,
   "performance": {
-    "total_return": 2.957851007222043,
-    "sharpe_ratio": 0.051090325733686236,
-    "max_drawdown": 2.237595299849363,
-    "annualized_return": 2.957851007222043,
+    "total_return": 3.5938732669418187,
+    "sharpe_ratio": 0.12367918924534457,
+    "max_drawdown": 1.8042502939568255,
+    "annualized_return": 3.5938732669418187,
     "annualized_volatility": 0.0,
     "win_rate": 0.0
   },
-  "timestamp": "2025-08-28T15:39:29.365082"
+  "timestamp": "2025-08-29T11:08:39.800658"
 }

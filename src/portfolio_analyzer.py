@@ -311,18 +311,30 @@ class PortfolioAnalyzer:
         
         return ManualPortfolio(price_data, decisions, init_cash)
     
-    def create_portfolio_from_test_data(self):
+    def create_portfolio_from_test_data(self, percentage: float = 50.0):
         """
         Create portfolio data from TLOB test data (gets data internally)
+        
+        Args:
+            percentage: Percentage of the model's last data to use (e.g., 50.0 for last 50%)
+                       This corresponds to val_split + test_split percentage
         
         Returns:
             DataFrame with portfolio prices
         """
-        print(f"📊 Creating portfolio from TLOB test data...")
+        print(f"📊 Creating portfolio from TLOB test data (last {percentage}%)...")
         
         try:
+            # Validate percentage parameter
+            if not 0 < percentage <= 100:
+                raise ValueError(f"Percentage must be between 0 and 100, got {percentage}")
+            
             # Get test data from TLOB integration
-            from .tlob_integration import TLOBIntegration
+            try:
+                from .tlob_integration import TLOBIntegration
+            except ImportError:
+                # Fallback for direct script execution
+                from tlob_integration import TLOBIntegration
             
             # Create TLOB integration instance to get test data
             tlob_config = {
@@ -343,7 +355,28 @@ class PortfolioAnalyzer:
             else:
                 test_data_np = test_data
             
-            print(f"   Test data shape: {test_data_np.shape}")
+            print(f"   Full test data shape: {test_data_np.shape}")
+            
+            # Calculate the slice for the last percentage of data
+            total_samples = test_data_np.shape[0]
+            samples_to_take = int(total_samples * (percentage / 100.0))
+            
+            # Ensure minimum number of samples
+            min_samples = 5  # Minimum 5 samples required
+            if samples_to_take < min_samples:
+                samples_to_take = min_samples
+                print(f"   ⚠️ Requested {percentage}% would give {int(total_samples * (percentage / 100.0))} samples")
+                print(f"   📊 Using minimum {min_samples} samples instead")
+            
+            # Ensure we don't exceed total samples
+            samples_to_take = min(samples_to_take, total_samples)
+            start_index = total_samples - samples_to_take
+            
+            # Take only the last percentage of data
+            test_data_np = test_data_np[start_index:]
+            
+            print(f"   Using last {percentage}% of data: {samples_to_take} samples (from index {start_index})")
+            print(f"   Selected data shape: {test_data_np.shape}")
             
             # Handle 3D data: [samples, seq_size, features]
             if len(test_data_np.shape) == 3:
@@ -414,13 +447,14 @@ class PortfolioAnalyzer:
             
         except Exception as e:
             print(f"❌ Error creating portfolio from test data: {e}")
-            # Fallback: create simple portfolio
+            # Fallback: create simple portfolio with percentage-based size
+            fallback_size = max(50, int(100 * (percentage / 100.0)))  # At least 50 points
             fallback_data = pd.DataFrame({
-                'TLOB_TEST': np.random.randn(100).cumsum() + 70.0
-            }, index=pd.date_range(datetime.now(), periods=100, freq='1T'))
+                'TLOB_TEST': np.random.randn(fallback_size).cumsum() + 70.0
+            }, index=pd.date_range(datetime.now(), periods=fallback_size, freq='1T'))
             
             self.portfolio_data = fallback_data
-            print(f"⚠️ Created fallback portfolio with {len(fallback_data)} points")
+            print(f"⚠️ Created fallback portfolio with {len(fallback_data)} points (based on {percentage}%)")
             return fallback_data
     
     def analyze_performance(self) -> Dict:
