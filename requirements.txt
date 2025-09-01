@@ -26,3 +26,7 @@ pyfolio>=0.9.2
 tqdm>=4.64.0
 jupyter>=1.0.0
 notebook>=6.4.0 
+
+# LSTM
+tensorflow>=2.16
+ipykernel>=6.25.0
