@@ -60,15 +60,15 @@ class LSTMAnalyzer:
         num_val = int(val_split * data.shape[0])
     
         # X will be sequences of length (SEQ_LEN - 10)
-        # y will be the 10th step after the X sequence ends
+        # y will be the next single step after the X sequence ends
         X_train = data[:num_train, :-10, :]
-        y_train = data[:num_train, -10, :]
+        y_train = data[:num_train, -1, :]  # Son zaman adımı
     
         X_val = data[num_train:num_train + num_val, :-10, :]
-        y_val = data[num_train:num_train + num_val, -10, :]
+        y_val = data[num_train:num_train + num_val, -1, :]  # Son zaman adımı
     
         X_test = data[num_train + num_val:, :-10, :]
-        y_test = data[num_train + num_val:, :-10, :]
+        y_test = data[num_train + num_val:, -1, :]  # Son zaman adımı
     
         return X_train, y_train, X_val, y_val, X_test, y_test
 
@@ -201,6 +201,10 @@ class LSTMAnalyzer:
         model.add(Dropout(rate=DROPOUT))
         model.add(Dense(units=N_FEATURES))
         model.add(Activation('linear'))
+        
+        # Model summary'yi yazdır
+        print("\nModel Architecture:")
+        model.summary()
     
         lr_scheduler = keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss', 
@@ -229,7 +233,7 @@ class LSTMAnalyzer:
             history = model.fit(
                 X_train,
                 y_train,
-                epochs=350,
+                epochs=100,
                 batch_size=BATCH_SIZE,
                 shuffle=False, 
                 validation_data=(X_val, y_val),
@@ -256,6 +260,15 @@ class LSTMAnalyzer:
             best_model = model 
     
         print("\nEvaluating model on test data...")
+        
+        # Boyut kontrolü
+        print(f"X_test shape: {X_test.shape}")
+        print(f"y_test shape: {y_test.shape}")
+        
+        # Model çıktı boyutunu kontrol et
+        test_prediction = best_model.predict(X_test[:1], verbose=0)
+        print(f"Model output shape: {test_prediction.shape}")
+        
         test_loss, test_mape = best_model.evaluate(X_test, y_test, verbose=0)
         print(f"Test Loss (best model): {test_loss:.6f}")
         print(f"Test MAPE (best model): {test_mape:.2f}%")
