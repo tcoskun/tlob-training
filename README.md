@@ -20,6 +20,7 @@ tlob-training/
 ├── main.py                           # TLOB Data Traning & TLOB VectorBt Backtesting
 ├── lstm_main.py                      # LSTM Data Traning & LSTM VectorBt Backtesting
 ```
+Not: models/tensorflow_results.pkl dosyası büyük olduğu için zip olarak eklendi
 
 ## 🚀 Kurulum
 
