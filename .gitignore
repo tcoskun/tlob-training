@@ -1,0 +1,4 @@
+models/tensorflow_results.pkl
+notebooks/.ipynb_checkpoints
+notebooks/graphs
+results
