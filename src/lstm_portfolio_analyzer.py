@@ -40,7 +40,7 @@ class LSTMPortfolioAnalyzer:
         self.y_hat_last = None,
         self.SEQ_LEN = None
 
-    def readModel(self):
+    def readModel(self, percentage: float = 50.0):
         try:
           # Proje kök dizinini bul
           import os
@@ -57,27 +57,55 @@ class LSTMPortfolioAnalyzer:
                 print(f"Error loading TensorFlow results: {e}")
                 return
             
-        self.price_data = tensorflow_results['df']
-        self.y_hat_last = tensorflow_results['y_hat_last']
+        # Load full data first
+        full_price_data = tensorflow_results['df']
+        full_y_hat_last = tensorflow_results['y_hat_last']
         self.SEQ_LEN = tensorflow_results['SEQ_LEN']
 
-        print(f"DataFrame shape: {self.price_data.shape}")
-        print(f"Predicted prices length: {len(self.y_hat_last)}")
+        print(f"Full DataFrame shape: {full_price_data.shape}")
+        print(f"Full predicted prices length: {len(full_y_hat_last)}")
         print(f"Sequence length: {self.SEQ_LEN}")
         
-        self.start_index = self.SEQ_LEN + int(0.5 * (len(self.price_data) - self.SEQ_LEN))
+        # Calculate the slice for the last percentage of data
+        total_samples = len(full_price_data)
+        samples_to_take = int(total_samples * (percentage / 100.0))
+        
+        # Ensure minimum number of samples
+        min_samples = 5  # Minimum 5 samples required
+        if samples_to_take < min_samples:
+            samples_to_take = min_samples
+            print(f"   ⚠️ Requested {percentage}% would give {int(total_samples * (percentage / 100.0))} samples")
+            print(f"   📊 Using minimum {min_samples} samples instead")
+        
+        # Ensure we don't exceed total samples
+        samples_to_take = min(samples_to_take, total_samples)
+        start_index = total_samples - samples_to_take
+        
+        # Take only the last percentage of data
+        self.price_data = full_price_data.iloc[start_index:]
+        
+        # Also limit y_hat_last to match the data
+        y_hat_samples = int(len(full_y_hat_last) * (percentage / 100.0))
+        self.y_hat_last = full_y_hat_last[-y_hat_samples:]
+        
+        # Reset start_index since we're now working with limited data
+        self.start_index = 0
+        
+        print(f"Using last {percentage}% of data: {samples_to_take} samples (from index {start_index})")
+        print(f"Limited DataFrame shape: {self.price_data.shape}")
+        print(f"Limited predicted prices length: {len(self.y_hat_last)}")
 
     def create_trading_decisions(self, strategy_type):
         self.strategy_type = strategy_type
 
         MOMENTUM_CONFIG = {
-            'min_threshold': 0.0005,     
-            'trend_window': 3,           
-            'volatility_max': 0.01, 
-            'volatility_window': 10,
-            'min_trade_interval': 5,
-            'profit_take_threshold': 0.002,
-            'stop_loss_threshold': 0.001
+            'min_threshold': 0.01, 
+            'trend_window': 50,           
+            'volatility_max': 0.0005, 
+            'volatility_window': 50,
+            'min_trade_interval': 20,
+            'profit_take_threshold': 0.008,
+            'stop_loss_threshold': 0.005
         }
         
         MEAN_REVERSION_CONFIG = {
@@ -102,10 +130,20 @@ class LSTMPortfolioAnalyzer:
         
         decisions = pd.Series(0, index=self.price_data.index, dtype=int)
     
-        test_end_index = self.start_index + len(self.y_hat_last)
-        if test_end_index > len(self.price_data):
-            test_end_index = len(self.price_data)
-            self.y_hat_last = self.y_hat_last[:len(self.price_data) - self.start_index]
+        # Since we're now working with limited data, test_end_index is simply the length of our data
+        test_end_index = len(self.price_data)
+        
+        # Ensure y_hat_last matches our data length
+        if len(self.y_hat_last) > test_end_index:
+            self.y_hat_last = self.y_hat_last[:test_end_index]
+        elif len(self.y_hat_last) < test_end_index:
+            # If y_hat_last is shorter, pad with zeros or repeat last value
+            padding_needed = test_end_index - len(self.y_hat_last)
+            if len(self.y_hat_last) > 0:
+                last_value = self.y_hat_last[-1]
+                self.y_hat_last = np.concatenate([self.y_hat_last, np.full(padding_needed, last_value)])
+            else:
+                self.y_hat_last = np.zeros(test_end_index)
     
         test_indices = self.price_data.index[self.start_index:test_end_index]
     
@@ -572,13 +610,13 @@ class LSTMPortfolioAnalyzer:
                 size=weights,
                 size_type='amount',
                 freq='1min',
-                init_cash=100,
+                init_cash=10000,
                 cash_sharing=True,
                 call_seq='auto',
                 fees=0.001,
                 slippage=0.0005
             )
-    
+
             full_stats = pf.stats()
             ann_factor = pf.returns().vbt.returns().ann_factor
             
@@ -601,11 +639,11 @@ class LSTMPortfolioAnalyzer:
             
             print(f"\nAnn Factor:                         {ann_factor}")
             print("\nBacktest Stats:")
-            print(f"Total Return [%]:                   {total_return:.3f}%")
-            print(f"Annualized Expected Return [%]:     {annualized_return:.3f}%")
-            print(f"Annualized Expected Volatility [%]: {annualized_volatility:.3f}%")
+            print(f"Total Return [%]:                   {total_return:/100:.2%}%")
+            print(f"Annualized Expected Return [%]:     {annualized_return/100:.2%}%")
+            print(f"Annualized Expected Volatility [%]: {annualized_volatility/100:.2%}%")
             print(f"Sharpe Ratio:                       {sharpe_ratio:.3f}")
-            print(f"Max Drawdown [%]:                   {max_drawdown:.3f}%")
+            print(f"Max Drawdown [%]:                   {max_drawdown/100:.2%}%")
             print(f"Win Rate:                           {full_stats['Win Rate [%]']:.3f}%")
             print(f"Profit Factor:                      {full_stats['Profit Factor']:.3f}")
             print(f"Calmar Ratio:                       {full_stats['Calmar Ratio']:.3f}")

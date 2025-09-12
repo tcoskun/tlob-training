@@ -223,7 +223,7 @@ class LSTMAnalyzer:
             verbose=1
         )
     
-        adam = Adam(learning_rate=1e-4)
+        adam = Adam(learning_rate=5e-3)
         model.compile(loss='mean_squared_error', optimizer=adam, metrics=[self.mean_absolute_percentage_error])
         
         BATCH_SIZE = 300
